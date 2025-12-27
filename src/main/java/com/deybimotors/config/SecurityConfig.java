@@ -49,14 +49,22 @@ public class SecurityConfig {
                         .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
 
-                        // Endpoints de sedes (Admin y Almacenero)
-                        .requestMatchers("/api/sedes/**").hasAnyRole("ADMIN", "ALMACENERO")
+                        // Endpoints de sedes (Admin, Almacenero y Vendedor)
+                        .requestMatchers("/api/sedes/**").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
 
-                        // Endpoints de compras (Admin y Almacenero)
-                        .requestMatchers("/api/compras/**").hasAnyRole("ADMIN", "ALMACENERO")
+                        // ✅ Endpoints de compras (Admin, Almacenero y Vendedor pueden crear)
+                        .requestMatchers(HttpMethod.POST, "/api/compras").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
+                        .requestMatchers(HttpMethod.POST, "/api/compras/*/factura").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/compras/*/estado").hasAnyRole("ADMIN", "ALMACENERO")
+                        .requestMatchers(HttpMethod.GET, "/api/compras/**").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
 
-                        // Endpoints de stock (Admin y Almacenero)
-                        .requestMatchers("/api/stock/**").hasAnyRole("ADMIN", "ALMACENERO")
+                        // ✅ Endpoints de stock (Admin, Almacenero y Vendedor)
+                        .requestMatchers(HttpMethod.GET, "/api/stock/**").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
+                        .requestMatchers(HttpMethod.POST, "/api/stock/salida").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
+                        .requestMatchers(HttpMethod.POST, "/api/stock/ajustar").hasAnyRole("ADMIN", "ALMACENERO")
+
+                        // ✅ Endpoints de Kardex (todos los roles autenticados pueden ver)
+                        .requestMatchers(HttpMethod.GET, "/api/kardex/**").hasAnyRole("ADMIN", "ALMACENERO", "VENDEDOR")
 
                         // Resto de endpoints requieren autenticación
                         .anyRequest().authenticated()

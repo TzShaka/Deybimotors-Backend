@@ -1,6 +1,7 @@
 package com.deybimotors.controller;
 
 import com.deybimotors.dto.ProductoDTO;
+import com.deybimotors.security.SecurityUtils;
 import com.deybimotors.service.ProductoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +10,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,8 +18,7 @@ import java.util.List;
 
 /**
  * Controlador de Productos - RF-004 a RF-017
- * ACTUALIZADO: Sin referencias a modeloId
- * Endpoints: /api/productos/**
+ * ✅ ACTUALIZADO: Usa SecurityUtils
  */
 @RestController
 @RequestMapping("/api/productos")
@@ -28,6 +27,7 @@ import java.util.List;
 public class ProductoController {
 
     private final ProductoService productoService;
+    private final SecurityUtils securityUtils;
 
     /**
      * GET /api/productos
@@ -76,7 +76,7 @@ public class ProductoController {
 
     /**
      * GET /api/productos/buscar
-     * Buscar productos con filtros avanzados - ACTUALIZADO sin modeloId
+     * Buscar productos con filtros avanzados
      */
     @GetMapping("/buscar")
     public ResponseEntity<List<ProductoDTO.ProductoResponse>> buscarConFiltros(
@@ -92,15 +92,14 @@ public class ProductoController {
     /**
      * POST /api/productos
      * Crear nuevo producto
+     * ✅ ACTUALIZADO: Obtiene usuario autenticado del token
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
     public ResponseEntity<ProductoDTO.ProductoResponse> crear(
-            @Valid @RequestBody ProductoDTO.ProductoRequest request,
-            Authentication authentication
+            @Valid @RequestBody ProductoDTO.ProductoRequest request
     ) {
-        // Aquí deberías obtener el ID del usuario desde el token JWT
-        Long usuarioId = 1L; // Temporal - implementar extracción real del token
+        Long usuarioId = securityUtils.getAuthenticatedUserId();
         ProductoDTO.ProductoResponse response = productoService.crear(request, usuarioId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

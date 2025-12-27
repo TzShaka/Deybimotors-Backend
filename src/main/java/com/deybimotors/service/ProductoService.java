@@ -441,7 +441,14 @@ public class ProductoService {
         dto.setCodigo(producto.getCodigoInterno());
         dto.setCodigoMarca(producto.getCodigoMarca());
         dto.setCodigoReferencia(producto.getCodigoReferencia());
-        dto.setNombre(producto.getDescripcion());
+
+        // ✅ AGREGAR: Código OEM desde la relación
+        if (!producto.getCodigosOem().isEmpty()) {
+            dto.setCodigoOem(producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem());
+        } else {
+            dto.setCodigoOem(null);
+        }
+
         dto.setDescripcion(producto.getDescripcion());
 
         // Categorización
@@ -455,6 +462,22 @@ public class ProductoService {
 
         dto.setMarcaId(producto.getMarcaProducto().getId());
         dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
+
+        // ✅ AGREGAR: Datos del vehículo desde compatibilidades
+        if (!producto.getCompatibilidades().isEmpty()) {
+            Compatibilidad compat = producto.getCompatibilidades().get(0);
+            dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
+            if (compat.getModeloAutomovil() != null) {
+                dto.setModeloAutomovil(compat.getModeloAutomovil().getNombre());
+            }
+            dto.setAnio(compat.getAnio());
+            dto.setMotor(compat.getMotor());
+        } else {
+            dto.setMarcaAutomovil(null);
+            dto.setModeloAutomovil(null);
+            dto.setAnio(null);
+            dto.setMotor(null);
+        }
 
         // Especificaciones técnicas
         dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);

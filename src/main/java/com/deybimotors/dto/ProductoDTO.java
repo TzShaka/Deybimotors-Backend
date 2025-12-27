@@ -24,8 +24,7 @@ public class ProductoDTO {
         private String codigo;
         private String codigoMarca;
         private String codigoReferencia;
-        private String codigoOem;
-        private String nombre;
+        private String codigoOem;           // ✅ Este campo
         private String descripcion;
 
         // Categorización
@@ -35,10 +34,12 @@ public class ProductoDTO {
         private String subcategoriaNombre;
         private Long marcaId;
         private String marcaNombre;
-        private String marcaAutomovil;
-        private String modeloAutomovil;
-        private String anio;
-        private String motor;
+
+        // ✅ Datos del vehículo
+        private String marcaAutomovil;      // ✅ Este campo
+        private String modeloAutomovil;     // ✅ Este campo
+        private String anio;                // ✅ Este campo
+        private String motor;               // ✅ Este campo
 
         // Especificaciones técnicas
         private String origen;

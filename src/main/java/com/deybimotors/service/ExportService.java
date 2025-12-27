@@ -4,6 +4,7 @@ import com.deybimotors.entity.MovimientoKardex;
 import com.deybimotors.entity.Producto;
 import com.deybimotors.repository.MovimientoKardexRepository;
 import com.deybimotors.repository.ProductoRepository;
+import com.deybimotors.entity.Compatibilidad;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -58,14 +59,42 @@ public class ExportService {
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
         headerFont.setBold(true);
+        headerFont.setColor(IndexedColors.WHITE.getIndex());
         headerStyle.setFont(headerFont);
-        headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
         headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        headerStyle.setAlignment(HorizontalAlignment.CENTER);
 
-        // Cabecera
+        // Estilo para precios
+        CellStyle precioStyle = workbook.createCellStyle();
+        precioStyle.setDataFormat(workbook.createDataFormat().getFormat("S/ #,##0.00"));
+
+        // ✅ COLUMNAS COMPLETAS
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
-                "Código", "Descripción", "Categoría", "Marca", "Stock", "Stock Mínimo", "Precio Venta", "Sede"
+                "Código",
+                "Código Marca",
+                "Código Ref",
+                "Código OEM",
+                "Descripción",
+                "Categoría",
+                "Subcategoría",
+                "Marca",
+                "Marca Auto",
+                "Modelo Auto",
+                "Año",
+                "Motor",
+                "Origen",
+                "Medida",
+                "Diámetro",
+                "Tipo",
+                "Medida 2",
+                "Stock",
+                "Stock Mín",
+                "Precio Costo",
+                "Precio Venta",
+                "Código Precio",
+                "Sede"
         };
 
         for (int i = 0; i < columnas.length; i++) {
@@ -74,30 +103,134 @@ public class ExportService {
             cell.setCellStyle(headerStyle);
         }
 
-        // Datos
+        // ✅ DATOS COMPLETOS
         int rowNum = 1;
         for (Producto producto : productos) {
             Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(producto.getCodigoInterno());
-            row.createCell(1).setCellValue(producto.getDescripcion());
-            row.createCell(2).setCellValue(producto.getCategoria().getNombre());
-            row.createCell(3).setCellValue(producto.getMarcaProducto().getNombre());
-            row.createCell(4).setCellValue(producto.getStock());
-            row.createCell(5).setCellValue(producto.getStockMinimo());
-            row.createCell(6).setCellValue(producto.getPrecioVenta().doubleValue());
-            row.createCell(7).setCellValue(producto.getSede().getNombre());
+
+            int colNum = 0;
+
+            // Código
+            row.createCell(colNum++).setCellValue(producto.getCodigoInterno());
+
+            // Código Marca
+            row.createCell(colNum++).setCellValue(
+                    producto.getCodigoMarca() != null ? producto.getCodigoMarca() : ""
+            );
+
+            // Código Referencia
+            row.createCell(colNum++).setCellValue(
+                    producto.getCodigoReferencia() != null ? producto.getCodigoReferencia() : ""
+            );
+
+            // Código OEM
+            String codigoOem = "";
+            if (!producto.getCodigosOem().isEmpty()) {
+                codigoOem = producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem();
+            }
+            row.createCell(colNum++).setCellValue(codigoOem);
+
+            // Descripción
+            row.createCell(colNum++).setCellValue(producto.getDescripcion());
+
+            // Categoría
+            row.createCell(colNum++).setCellValue(producto.getCategoria().getNombre());
+
+            // Subcategoría
+            row.createCell(colNum++).setCellValue(
+                    producto.getSubcategoria() != null ? producto.getSubcategoria().getNombre() : ""
+            );
+
+            // Marca
+            row.createCell(colNum++).setCellValue(producto.getMarcaProducto().getNombre());
+
+            // Marca Automóvil, Modelo, Año, Motor
+            String marcaAuto = "";
+            String modeloAuto = "";
+            String anio = "";
+            String motor = "";
+            if (!producto.getCompatibilidades().isEmpty()) {
+                Compatibilidad compat = producto.getCompatibilidades().get(0);
+                if (compat.getMarcaAutomovil() != null) {
+                    marcaAuto = compat.getMarcaAutomovil().getNombre();
+                }
+                if (compat.getModeloAutomovil() != null) {
+                    modeloAuto = compat.getModeloAutomovil().getNombre();
+                }
+                anio = compat.getAnio() != null ? compat.getAnio() : "";
+                motor = compat.getMotor() != null ? compat.getMotor() : "";
+            }
+            row.createCell(colNum++).setCellValue(marcaAuto);
+            row.createCell(colNum++).setCellValue(modeloAuto);
+            row.createCell(colNum++).setCellValue(anio);
+            row.createCell(colNum++).setCellValue(motor);
+
+            // Origen
+            row.createCell(colNum++).setCellValue(
+                    producto.getOrigen() != null ? producto.getOrigen().getPais() : ""
+            );
+
+            // Medida
+            row.createCell(colNum++).setCellValue(
+                    producto.getMedida() != null ? producto.getMedida() : ""
+            );
+
+            // Diámetro
+            row.createCell(colNum++).setCellValue(
+                    producto.getDiametro() != null ? producto.getDiametro() : ""
+            );
+
+            // Tipo
+            row.createCell(colNum++).setCellValue(
+                    producto.getTipo() != null ? producto.getTipo() : ""
+            );
+
+            // Medida 2
+            row.createCell(colNum++).setCellValue(
+                    producto.getMedida2() != null ? producto.getMedida2() : ""
+            );
+
+            // Stock
+            row.createCell(colNum++).setCellValue(producto.getStock());
+
+            // Stock Mínimo
+            row.createCell(colNum++).setCellValue(producto.getStockMinimo());
+
+            // Precio Costo
+            Cell precioCostoCell = row.createCell(colNum++);
+            precioCostoCell.setCellValue(
+                    producto.getPrecioCosto() != null ? producto.getPrecioCosto().doubleValue() : 0
+            );
+            precioCostoCell.setCellStyle(precioStyle);
+
+            // Precio Venta
+            Cell precioVentaCell = row.createCell(colNum++);
+            precioVentaCell.setCellValue(producto.getPrecioVenta().doubleValue());
+            precioVentaCell.setCellStyle(precioStyle);
+
+            // Código Precio
+            row.createCell(colNum++).setCellValue(
+                    producto.getCodigoPrecio() != null ? producto.getCodigoPrecio().getCodigo() : ""
+            );
+
+            // Sede
+            row.createCell(colNum++).setCellValue(producto.getSede().getNombre());
         }
 
         // Ajustar columnas
         for (int i = 0; i < columnas.length; i++) {
             sheet.autoSizeColumn(i);
+            // Asegurar ancho mínimo para columnas largas
+            if (i == 4) { // Descripción
+                sheet.setColumnWidth(i, 8000);
+            }
         }
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         workbook.write(baos);
         workbook.close();
 
-        log.info("Productos exportados a Excel: {} registros", productos.size());
+        log.info("Productos exportados a Excel: {} registros con {} columnas", productos.size(), columnas.length);
         return baos.toByteArray();
     }
 

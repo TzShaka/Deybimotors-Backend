@@ -1,19 +1,19 @@
 package com.deybimotors.controller;
 
 import com.deybimotors.dto.StockDTO;
+import com.deybimotors.security.SecurityUtils;
 import com.deybimotors.service.StockService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
  * Controlador de Stock - RF-011, RF-018, RF-019
- * Endpoints: /api/stock/**
+ * ✅ ACTUALIZADO: Usa SecurityUtils para obtener usuario autenticado
  */
 @RestController
 @RequestMapping("/api/stock")
@@ -23,6 +23,7 @@ import java.util.List;
 public class StockController {
 
     private final StockService stockService;
+    private final SecurityUtils securityUtils;
 
     /**
      * GET /api/stock/producto/{productoId}
@@ -63,26 +64,27 @@ public class StockController {
     /**
      * POST /api/stock/ajustar
      * Ajustar stock manualmente
+     * ✅ ACTUALIZADO: Obtiene usuario autenticado del token
      */
     @PostMapping("/ajustar")
     public ResponseEntity<StockDTO.StockResponse> ajustarStock(
-            @Valid @RequestBody StockDTO.AjusteStockRequest request,
-            Authentication authentication
+            @Valid @RequestBody StockDTO.AjusteStockRequest request
     ) {
-        Long usuarioId = 1L; // Temporal - implementar extracción del token
+        Long usuarioId = securityUtils.getAuthenticatedUserId();
         return ResponseEntity.ok(stockService.ajustarStock(request, usuarioId));
     }
 
     /**
      * POST /api/stock/salida
      * Registrar salida de productos (carrito)
+     * ✅ ACTUALIZADO: Obtiene usuario autenticado del token
      */
     @PostMapping("/salida")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'ALMACENERO')") // ✅ VENDEDOR también puede hacer ventas
     public ResponseEntity<String> registrarSalida(
-            @Valid @RequestBody StockDTO.ConfirmarSalidaRequest request,
-            Authentication authentication
+            @Valid @RequestBody StockDTO.ConfirmarSalidaRequest request
     ) {
-        Long usuarioId = 1L; // Temporal - implementar extracción del token
+        Long usuarioId = securityUtils.getAuthenticatedUserId();
         stockService.registrarSalida(request, usuarioId);
         return ResponseEntity.ok("Salida registrada correctamente");
     }

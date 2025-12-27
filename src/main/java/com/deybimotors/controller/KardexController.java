@@ -5,6 +5,7 @@ import com.deybimotors.service.KardexService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -12,12 +13,13 @@ import java.util.List;
 
 /**
  * Controlador de Kardex - RF-033 a RF-039
- * Endpoints: /api/kardex/**
+ * ✅ ACTUALIZADO: VENDEDOR también puede ver el kardex
  */
 @RestController
 @RequestMapping("/api/kardex")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO', 'VENDEDOR')")
 public class KardexController {
 
     private final KardexService kardexService;
