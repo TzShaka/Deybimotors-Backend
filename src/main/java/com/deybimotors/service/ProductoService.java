@@ -16,13 +16,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * Servicio de Productos - RF-004 a RF-017
- * ACTUALIZADO: Gestión completa con todos los campos de repuestos automotrices
+ * COMPLETAMENTE REESCRITO para la estructura real de BD
  */
 @Service
 @RequiredArgsConstructor
@@ -32,17 +31,19 @@ public class ProductoService {
     private final CategoriaRepository categoriaRepository;
     private final SubcategoriaRepository subcategoriaRepository;
     private final MarcaRepository marcaRepository;
-    private final StockRepository stockRepository;
-    private final ProductoFotoRepository productoFotoRepository;
-    private final FileStorageService fileStorageService;
+    private final SedeRepository sedeRepository;
+    private final OrigenRepository origenRepository;
+    private final CodigoPrecioRepository codigoPrecioRepository;
+    private final ImagenProductoRepository imagenProductoRepository;
     private final MovimientoKardexRepository kardexRepository;
+    private final FileStorageService fileStorageService;
 
     /**
      * Listar todos los productos - RF-004
      */
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoResponse> listarTodos() {
-        return productoRepository.findByActivoTrue().stream()
+        return productoRepository.findByEstadoTrue().stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
@@ -61,19 +62,13 @@ public class ProductoService {
      */
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoConStockResponse> listarConStockPorSede(Long sedeId) {
-        List<Producto> productos = productoRepository.findByActivoTrue();
+        List<Producto> productos = productoRepository.findBySedeId(sedeId);
 
         return productos.stream()
                 .map(producto -> {
                     ProductoDTO.ProductoConStockResponse dto = new ProductoDTO.ProductoConStockResponse();
-                    // Copiar datos básicos
                     copiarDatosBasicos(producto, dto);
-
-                    // Obtener stock de la sede específica
-                    Stock stock = stockRepository.findByProductoIdAndSedeId(producto.getId(), sedeId)
-                            .orElse(null);
-                    dto.setStockSede(stock != null ? stock.getCantidad() : 0);
-
+                    dto.setStockSede(producto.getStock()); // Stock de la sede
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -94,7 +89,7 @@ public class ProductoService {
 
         if (nombre != null && !nombre.isEmpty()) {
             spec = spec.and((root, query, cb) ->
-                    cb.like(cb.lower(root.get("nombre")), "%" + nombre.toLowerCase() + "%"));
+                    cb.like(cb.lower(root.get("descripcion")), "%" + nombre.toLowerCase() + "%"));
         }
 
         if (categoriaId != null) {
@@ -109,15 +104,15 @@ public class ProductoService {
 
         if (marcaId != null) {
             spec = spec.and((root, query, cb) ->
-                    cb.equal(root.get("marca").get("id"), marcaId));
+                    cb.equal(root.get("marcaProducto").get("id"), marcaId));
         }
 
         if (codigo != null && !codigo.isEmpty()) {
             spec = spec.and((root, query, cb) ->
-                    cb.like(cb.lower(root.get("codigo")), "%" + codigo.toLowerCase() + "%"));
+                    cb.like(cb.lower(root.get("codigoInterno")), "%" + codigo.toLowerCase() + "%"));
         }
 
-        spec = spec.and((root, query, cb) -> cb.equal(root.get("activo"), true));
+        spec = spec.and((root, query, cb) -> cb.equal(root.get("estado"), true));
 
         return productoRepository.findAll(spec).stream()
                 .map(this::convertirADTO)
@@ -139,7 +134,7 @@ public class ProductoService {
      */
     @Transactional(readOnly = true)
     public ProductoDTO.ProductoResponse obtenerPorCodigo(String codigo) {
-        Producto producto = productoRepository.findByCodigo(codigo)
+        Producto producto = productoRepository.findByCodigoInterno(codigo)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con código: " + codigo));
         return convertirADTO(producto);
     }
@@ -151,11 +146,14 @@ public class ProductoService {
     public ProductoDTO.ProductoResponse crear(ProductoDTO.ProductoRequest request, Long usuarioId) {
 
         // Validar que no exista el código
-        if (productoRepository.existsByCodigo(request.getCodigo())) {
+        if (productoRepository.existsByCodigoInterno(request.getCodigo())) {
             throw new ConflictException("Ya existe un producto con el código: " + request.getCodigo());
         }
 
         // Validar entidades relacionadas
+        Sede sede = sedeRepository.findById(request.getSedeId() != null ? request.getSedeId() : 1L)
+                .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
+
         Categoria categoria = categoriaRepository.findById(request.getCategoriaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
 
@@ -168,39 +166,49 @@ public class ProductoService {
                     .orElseThrow(() -> new ResourceNotFoundException("Subcategoría no encontrada"));
         }
 
+        // Buscar o crear origen
+        Origen origen = null;
+        if (request.getOrigen() != null && !request.getOrigen().isEmpty()) {
+            origen = origenRepository.findByPais(request.getOrigen())
+                    .orElseGet(() -> {
+                        Origen nuevoOrigen = new Origen();
+                        nuevoOrigen.setPais(request.getOrigen());
+                        return origenRepository.save(nuevoOrigen);
+                    });
+        }
+
+        // Buscar o crear código de precio
+        CodigoPrecio codigoPrecio = null;
+        if (request.getCodigoPrecio() != null && !request.getCodigoPrecio().isEmpty()) {
+            codigoPrecio = codigoPrecioRepository.findByCodigo(request.getCodigoPrecio())
+                    .orElseGet(() -> {
+                        CodigoPrecio nuevoCodigo = new CodigoPrecio();
+                        nuevoCodigo.setCodigo(request.getCodigoPrecio());
+                        return codigoPrecioRepository.save(nuevoCodigo);
+                    });
+        }
+
         // Crear producto
         Producto producto = new Producto();
-        producto.setCodigo(request.getCodigo());
+        producto.setSede(sede);
+        producto.setCodigoInterno(request.getCodigo());
         producto.setCodigoMarca(request.getCodigoMarca());
         producto.setCodigoReferencia(request.getCodigoReferencia());
-        producto.setCodigoOem(request.getCodigoOem());
-        producto.setNombre(request.getNombre());
-        producto.setDescripcion(request.getDescripcion());
+        producto.setDescripcion(request.getNombre());
         producto.setCategoria(categoria);
         producto.setSubcategoria(subcategoria);
-        producto.setMarca(marca);
-
-        // Datos del vehículo
-        producto.setMarcaAutomovil(request.getMarcaAutomovil());
-        producto.setModeloAutomovil(request.getModeloAutomovil());
-        producto.setAnio(request.getAnio());
-        producto.setMotor(request.getMotor());
-
-        // Especificaciones técnicas
-        producto.setOrigen(request.getOrigen());
+        producto.setMarcaProducto(marca);
+        producto.setOrigen(origen);
         producto.setMedida(request.getMedida());
         producto.setDiametro(request.getDiametro());
         producto.setTipo(request.getTipo());
         producto.setMedida2(request.getMedida2());
-
-        // Precios
-        producto.setPrecioVenta(request.getPrecioVenta());
-        producto.setPrecioCosto(request.getPrecioCosto());
-        producto.setCodigoPrecio(request.getCodigoPrecio());
+        producto.setStock(0); // Stock inicial
         producto.setStockMinimo(request.getStockMinimo());
-        producto.setPublicoCatalogo(request.getPublicoCatalogo());
-        producto.setActivo(true);
-        producto.setObservaciones(request.getObservaciones());
+        producto.setCodigoPrecio(codigoPrecio);
+        producto.setPrecioCosto(request.getPrecioCosto());
+        producto.setPrecioVenta(request.getPrecioVenta());
+        producto.setEstado(true);
 
         Producto guardado = productoRepository.save(producto);
         return convertirADTO(guardado);
@@ -216,24 +224,24 @@ public class ProductoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
         // Validar código si cambió
-        if (!producto.getCodigo().equals(request.getCodigo())) {
-            if (productoRepository.existsByCodigo(request.getCodigo())) {
+        if (!producto.getCodigoInterno().equals(request.getCodigo())) {
+            if (productoRepository.existsByCodigoInterno(request.getCodigo())) {
                 throw new ConflictException("Ya existe un producto con el código: " + request.getCodigo());
             }
-            producto.setCodigo(request.getCodigo());
+            producto.setCodigoInterno(request.getCodigo());
         }
 
-        // Validar y actualizar entidades relacionadas
+        // Actualizar entidades relacionadas
         if (!producto.getCategoria().getId().equals(request.getCategoriaId())) {
             Categoria categoria = categoriaRepository.findById(request.getCategoriaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
             producto.setCategoria(categoria);
         }
 
-        if (!producto.getMarca().getId().equals(request.getMarcaId())) {
+        if (!producto.getMarcaProducto().getId().equals(request.getMarcaId())) {
             Marca marca = marcaRepository.findById(request.getMarcaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Marca no encontrada"));
-            producto.setMarca(marca);
+            producto.setMarcaProducto(marca);
         }
 
         if (request.getSubcategoriaId() != null) {
@@ -244,33 +252,17 @@ public class ProductoService {
             producto.setSubcategoria(null);
         }
 
-        // Actualizar todos los campos
+        // Actualizar campos
         producto.setCodigoMarca(request.getCodigoMarca());
         producto.setCodigoReferencia(request.getCodigoReferencia());
-        producto.setCodigoOem(request.getCodigoOem());
-        producto.setNombre(request.getNombre());
-        producto.setDescripcion(request.getDescripcion());
-
-        // Datos del vehículo
-        producto.setMarcaAutomovil(request.getMarcaAutomovil());
-        producto.setModeloAutomovil(request.getModeloAutomovil());
-        producto.setAnio(request.getAnio());
-        producto.setMotor(request.getMotor());
-
-        // Especificaciones
-        producto.setOrigen(request.getOrigen());
+        producto.setDescripcion(request.getNombre());
         producto.setMedida(request.getMedida());
         producto.setDiametro(request.getDiametro());
         producto.setTipo(request.getTipo());
         producto.setMedida2(request.getMedida2());
-
-        // Precios
-        producto.setPrecioVenta(request.getPrecioVenta());
         producto.setPrecioCosto(request.getPrecioCosto());
-        producto.setCodigoPrecio(request.getCodigoPrecio());
+        producto.setPrecioVenta(request.getPrecioVenta());
         producto.setStockMinimo(request.getStockMinimo());
-        producto.setPublicoCatalogo(request.getPublicoCatalogo());
-        producto.setObservaciones(request.getObservaciones());
 
         Producto actualizado = productoRepository.save(producto);
         return convertirADTO(actualizado);
@@ -286,8 +278,8 @@ public class ProductoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
         switch (campo.toLowerCase()) {
-            case "nombre":
-                producto.setNombre((String) valor);
+            case "nombre", "descripcion":
+                producto.setDescripcion((String) valor);
                 break;
             case "precioventa":
                 producto.setPrecioVenta(new BigDecimal(valor.toString()));
@@ -297,18 +289,6 @@ public class ProductoService {
                 break;
             case "stockminimo":
                 producto.setStockMinimo(Integer.parseInt(valor.toString()));
-                break;
-            case "descripcion":
-                producto.setDescripcion((String) valor);
-                break;
-            case "marcaautomovil":
-                producto.setMarcaAutomovil((String) valor);
-                break;
-            case "modeloautomovil":
-                producto.setModeloAutomovil((String) valor);
-                break;
-            case "motor":
-                producto.setMotor((String) valor);
                 break;
             case "medida":
                 producto.setMedida((String) valor);
@@ -341,21 +321,16 @@ public class ProductoService {
             );
         }
 
-        // Verificar si tiene stock en alguna sede
-        List<Stock> stocks = stockRepository.findByProductoId(id);
-        boolean tieneStock = stocks.stream().anyMatch(s -> s.getCantidad() > 0);
-        if (tieneStock) {
+        // Verificar si tiene stock
+        if (producto.getStock() > 0) {
             throw new BadRequestException(
-                    "No se puede eliminar el producto porque tiene stock disponible en una o más sedes."
+                    "No se puede eliminar el producto porque tiene stock disponible."
             );
         }
 
-        // Eliminación lógica (recomendada) - RF-008
-        producto.setActivo(false);
+        // Eliminación lógica (recomendada)
+        producto.setEstado(false);
         productoRepository.save(producto);
-
-        // Opción 2: Eliminación física (descomentar si se requiere)
-        // productoRepository.delete(producto);
     }
 
     /**
@@ -372,20 +347,19 @@ public class ProductoService {
 
         // Si es principal, desmarcar las demás fotos
         if (esPrincipal) {
-            List<ProductoFoto> fotosActuales = productoFotoRepository.findByProductoIdOrderByOrdenAsc(productoId);
-            fotosActuales.forEach(foto -> foto.setPrincipal(false));
-            productoFotoRepository.saveAll(fotosActuales);
+            List<ImagenProducto> fotosActuales = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(productoId);
+            fotosActuales.forEach(foto -> foto.setEsPrincipal(false));
+            imagenProductoRepository.saveAll(fotosActuales);
         }
 
-        // Crear registro de foto
-        ProductoFoto foto = new ProductoFoto();
-        foto.setProducto(producto);
-        foto.setRutaArchivo(rutaArchivo);
-        foto.setNombreArchivo(archivo.getOriginalFilename());
-        foto.setPrincipal(esPrincipal);
-        foto.setOrden(producto.getFotos().size());
+        // Crear registro de imagen
+        ImagenProducto imagen = new ImagenProducto();
+        imagen.setProducto(producto);
+        imagen.setUrl(rutaArchivo);
+        imagen.setEsPrincipal(esPrincipal);
+        imagen.setOrden(producto.getImagenes().size() + 1);
 
-        productoFotoRepository.save(foto);
+        imagenProductoRepository.save(imagen);
     }
 
     /**
@@ -394,14 +368,14 @@ public class ProductoService {
     @Transactional
     public void eliminarFoto(Long fotoId) {
 
-        ProductoFoto foto = productoFotoRepository.findById(fotoId)
+        ImagenProducto foto = imagenProductoRepository.findById(fotoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Foto no encontrada"));
 
         // Eliminar archivo físico
-        fileStorageService.eliminarArchivo(foto.getRutaArchivo());
+        fileStorageService.eliminarArchivo(foto.getUrl());
 
         // Eliminar registro
-        productoFotoRepository.delete(foto);
+        imagenProductoRepository.delete(foto);
     }
 
     /**
@@ -411,16 +385,16 @@ public class ProductoService {
     public void establecerFotoPrincipal(Long productoId, Long fotoId) {
 
         // Desmarcar todas las fotos del producto
-        List<ProductoFoto> fotos = productoFotoRepository.findByProductoIdOrderByOrdenAsc(productoId);
-        fotos.forEach(foto -> foto.setPrincipal(false));
-        productoFotoRepository.saveAll(fotos);
+        List<ImagenProducto> fotos = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(productoId);
+        fotos.forEach(foto -> foto.setEsPrincipal(false));
+        imagenProductoRepository.saveAll(fotos);
 
         // Marcar la foto seleccionada como principal
-        ProductoFoto fotoPrincipal = productoFotoRepository.findById(fotoId)
+        ImagenProducto fotoPrincipal = imagenProductoRepository.findById(fotoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Foto no encontrada"));
 
-        fotoPrincipal.setPrincipal(true);
-        productoFotoRepository.save(fotoPrincipal);
+        fotoPrincipal.setEsPrincipal(true);
+        imagenProductoRepository.save(fotoPrincipal);
     }
 
     /**
@@ -431,7 +405,7 @@ public class ProductoService {
             Long categoriaId,
             Long marcaId
     ) {
-        List<Producto> productos = productoRepository.findByPublicoCatalogoTrueAndActivoTrue();
+        List<Producto> productos = productoRepository.findByEstadoTrue();
 
         // Aplicar filtros
         if (categoriaId != null) {
@@ -442,7 +416,7 @@ public class ProductoService {
 
         if (marcaId != null) {
             productos = productos.stream()
-                    .filter(p -> p.getMarca().getId().equals(marcaId))
+                    .filter(p -> p.getMarcaProducto().getId().equals(marcaId))
                     .collect(Collectors.toList());
         }
 
@@ -458,23 +432,16 @@ public class ProductoService {
     private ProductoDTO.ProductoResponse convertirADTO(Producto producto) {
         ProductoDTO.ProductoResponse dto = new ProductoDTO.ProductoResponse();
         copiarDatosBasicos(producto, dto);
-
-        // Calcular stock total en todas las sedes
-        List<Stock> stocks = stockRepository.findByProductoId(producto.getId());
-        int stockTotal = stocks.stream().mapToInt(Stock::getCantidad).sum();
-        dto.setStockTotal(stockTotal);
-
+        dto.setStockTotal(producto.getStock());
         return dto;
     }
 
     private void copiarDatosBasicos(Producto producto, ProductoDTO.ProductoResponse dto) {
-        // Identificadores y códigos
         dto.setId(producto.getId());
-        dto.setCodigo(producto.getCodigo());
+        dto.setCodigo(producto.getCodigoInterno());
         dto.setCodigoMarca(producto.getCodigoMarca());
         dto.setCodigoReferencia(producto.getCodigoReferencia());
-        dto.setCodigoOem(producto.getCodigoOem());
-        dto.setNombre(producto.getNombre());
+        dto.setNombre(producto.getDescripcion());
         dto.setDescripcion(producto.getDescripcion());
 
         // Categorización
@@ -486,17 +453,11 @@ public class ProductoService {
             dto.setSubcategoriaNombre(producto.getSubcategoria().getNombre());
         }
 
-        dto.setMarcaId(producto.getMarca().getId());
-        dto.setMarcaNombre(producto.getMarca().getNombre());
-
-        // Datos del vehículo
-        dto.setMarcaAutomovil(producto.getMarcaAutomovil());
-        dto.setModeloAutomovil(producto.getModeloAutomovil());
-        dto.setAnio(producto.getAnio());
-        dto.setMotor(producto.getMotor());
+        dto.setMarcaId(producto.getMarcaProducto().getId());
+        dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
 
         // Especificaciones técnicas
-        dto.setOrigen(producto.getOrigen());
+        dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
         dto.setMedida(producto.getMedida());
         dto.setDiametro(producto.getDiametro());
         dto.setTipo(producto.getTipo());
@@ -505,71 +466,60 @@ public class ProductoService {
         // Precios
         dto.setPrecioVenta(producto.getPrecioVenta());
         dto.setPrecioCosto(producto.getPrecioCosto());
-        dto.setCodigoPrecio(producto.getCodigoPrecio());
+        dto.setCodigoPrecio(producto.getCodigoPrecio() != null ? producto.getCodigoPrecio().getCodigo() : null);
 
         // Control
         dto.setStockMinimo(producto.getStockMinimo());
-        dto.setActivo(producto.getActivo());
-        dto.setPublicoCatalogo(producto.getPublicoCatalogo());
+        dto.setActivo(producto.getEstado());
         dto.setFechaCreacion(producto.getFechaCreacion());
 
         // Fotos
-        List<ProductoFoto> fotos = productoFotoRepository.findByProductoIdOrderByOrdenAsc(producto.getId());
-        dto.setFotos(fotos.stream().map(ProductoFoto::getRutaArchivo).collect(Collectors.toList()));
+        List<ImagenProducto> fotos = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(producto.getId());
+        dto.setFotos(fotos.stream().map(ImagenProducto::getUrl).collect(Collectors.toList()));
 
         fotos.stream()
-                .filter(ProductoFoto::getPrincipal)
+                .filter(ImagenProducto::getEsPrincipal)
                 .findFirst()
-                .ifPresent(foto -> dto.setFotoPrincipal(foto.getRutaArchivo()));
+                .ifPresent(foto -> dto.setFotoPrincipal(foto.getUrl()));
     }
 
     private ProductoDTO.ProductoCatalogoPublicoResponse convertirACatalogoPublicoDTO(Producto producto) {
         ProductoDTO.ProductoCatalogoPublicoResponse dto = new ProductoDTO.ProductoCatalogoPublicoResponse();
 
         dto.setId(producto.getId());
-        dto.setCodigo(producto.getCodigo());
-        dto.setNombre(producto.getNombre());
+        dto.setCodigo(producto.getCodigoInterno());
+        dto.setNombre(producto.getDescripcion());
         dto.setDescripcion(producto.getDescripcion());
 
-        // Categorización
         dto.setCategoriaNombre(producto.getCategoria().getNombre());
         dto.setSubcategoriaNombre(producto.getSubcategoria() != null ? producto.getSubcategoria().getNombre() : null);
-        dto.setMarcaNombre(producto.getMarca().getNombre());
+        dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
 
-        // Datos del vehículo
-        dto.setMarcaAutomovil(producto.getMarcaAutomovil());
-        dto.setModeloAutomovil(producto.getModeloAutomovil());
-        dto.setMotor(producto.getMotor());
-
-        // Especificaciones técnicas (las más relevantes para catálogo público)
-        dto.setOrigen(producto.getOrigen());
+        dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
         dto.setMedida(producto.getMedida());
         dto.setDiametro(producto.getDiametro());
         dto.setTipo(producto.getTipo());
 
-        // Precio
         dto.setPrecioVenta(producto.getPrecioVenta());
 
-        // Calcular disponibilidad - RF-060 (Semáforo)
-        List<Stock> stocks = stockRepository.findByProductoId(producto.getId());
-        int stockTotal = stocks.stream().mapToInt(Stock::getCantidad).sum();
-
-        if (stockTotal == 0) {
+        // Calcular disponibilidad - RF-060
+        int stock = producto.getStock();
+        if (stock == 0) {
             dto.setDisponibilidad("AGOTADO");
-        } else if (stockTotal <= producto.getStockMinimo()) {
+        } else if (stock <= producto.getStockMinimo()) {
             dto.setDisponibilidad("ULTIMAS_UNIDADES");
         } else {
             dto.setDisponibilidad("DISPONIBLE");
-        }
+        }   
 
         // Fotos
-        List<ProductoFoto> fotos = productoFotoRepository.findByProductoIdOrderByOrdenAsc(producto.getId());
-        dto.setFotos(fotos.stream().map(ProductoFoto::getRutaArchivo).collect(Collectors.toList()));
+        List<ImagenProducto> fotos = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(producto.getId());
+        dto.setFotos(fotos.stream().map(ImagenProducto::getUrl).collect(Collectors.toList()));
 
         fotos.stream()
-                .filter(ProductoFoto::getPrincipal)
+                .filter(ImagenProducto::getEsPrincipal)
                 .findFirst()
-                .ifPresent(foto -> dto.setFotoPrincipal(foto.getRutaArchivo()));
+                .ifPresent(foto -> dto.setFotoPrincipal(foto.getUrl()));
 
         return dto;
     }

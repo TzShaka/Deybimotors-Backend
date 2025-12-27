@@ -5,12 +5,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 /**
  * DTO para Usuario - RF-002, RF-054 a RF-057
+ * ✅ CORREGIDO: Agregado @EqualsAndHashCode
  */
 public class UsuarioDTO {
 
@@ -58,6 +60,7 @@ public class UsuarioDTO {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = false) // ✅ CORREGIDO
     public static class CrearUsuarioRequest extends UsuarioRequest {
         @NotBlank(message = "La contraseña es obligatoria")
         private String password;

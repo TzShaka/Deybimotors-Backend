@@ -6,15 +6,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Entidad Categoría - ✅ ACTUALIZADA
- * Ahora incluye descripcion y activo
+ * Entidad MarcaAutomovil
+ * Marcas de automóviles (TOYOTA, NISSAN, etc.)
  */
 @Entity
-@Table(name = "categorias")
+@Table(name = "marcas_automovil")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Categoria {
+public class MarcaAutomovil {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,10 +22,4 @@ public class Categoria {
 
     @Column(nullable = false, unique = true, length = 100)
     private String nombre;
-
-    @Column(length = 500)
-    private String descripcion;
-
-    @Column(nullable = false)
-    private Boolean activo = true;
 }

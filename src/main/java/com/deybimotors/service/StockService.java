@@ -15,21 +15,22 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Stock - RF-011, RF-018, RF-019
- * Gestión de inventario y movimientos
+ * Servicio de Stock - ✅ REESCRITO COMPLETO
+ * Trabaja directamente con productos.stock (NO hay tabla stock separada)
  */
 @Service
 @RequiredArgsConstructor
 public class StockService {
 
-    private final StockRepository stockRepository;
     private final ProductoRepository productoRepository;
     private final SedeRepository sedeRepository;
     private final UsuarioRepository usuarioRepository;
     private final MovimientoKardexRepository kardexRepository;
+    private final SalidaRepository salidaRepository;
+    private final DetalleSalidaRepository detalleSalidaRepository;
 
     /**
-     * Obtener stock de un producto en todas las sedes
+     * Obtener stock de un producto (en su sede asignada)
      */
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerStockProducto(Long productoId) {
@@ -37,11 +38,20 @@ public class StockService {
         Producto producto = productoRepository.findById(productoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        List<Stock> stocks = stockRepository.findByProductoId(productoId);
+        StockDTO.StockResponse response = new StockDTO.StockResponse(
+                producto.getId(),
+                producto.getId(),
+                producto.getCodigoInterno(),
+                producto.getDescripcion(),
+                producto.getSede().getId(),
+                producto.getSede().getNombre(),
+                producto.getStock(),
+                producto.getStockMinimo(),
+                producto.getFechaCreacion(),
+                calcularEstadoStock(producto)
+        );
 
-        return stocks.stream()
-                .map(stock -> convertirADTO(stock, producto))
-                .collect(Collectors.toList());
+        return List.of(response);
     }
 
     /**
@@ -53,10 +63,10 @@ public class StockService {
         Sede sede = sedeRepository.findById(sedeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
 
-        List<Stock> stocks = stockRepository.findBySedeId(sedeId);
+        List<Producto> productos = productoRepository.findBySedeId(sedeId);
 
-        return stocks.stream()
-                .map(stock -> convertirADTO(stock, stock.getProducto()))
+        return productos.stream()
+                .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
 
@@ -66,10 +76,10 @@ public class StockService {
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerProductosSinStock(Long sedeId) {
 
-        List<Stock> stocks = stockRepository.findProductosSinStockPorSede(sedeId);
+        List<Producto> productos = productoRepository.findProductosSinStockPorSede(sedeId);
 
-        return stocks.stream()
-                .map(stock -> convertirADTO(stock, stock.getProducto()))
+        return productos.stream()
+                .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
 
@@ -79,10 +89,10 @@ public class StockService {
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerProductosStockBajo(Long sedeId) {
 
-        List<Stock> stocks = stockRepository.findProductosStockBajoPorSede(sedeId);
+        List<Producto> productos = productoRepository.findProductosStockBajoPorSede(sedeId);
 
-        return stocks.stream()
-                .map(stock -> convertirADTO(stock, stock.getProducto()))
+        return productos.stream()
+                .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
 
@@ -95,53 +105,39 @@ public class StockService {
         Producto producto = productoRepository.findById(request.getProductoId())
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        Sede sede = sedeRepository.findById(request.getSedeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
-
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        // Obtener o crear stock
-        Stock stock = stockRepository.findByProductoIdAndSedeId(request.getProductoId(), request.getSedeId())
-                .orElseGet(() -> {
-                    Stock nuevoStock = new Stock();
-                    nuevoStock.setProducto(producto);
-                    nuevoStock.setSede(sede);
-                    nuevoStock.setCantidad(0);
-                    return nuevoStock;
-                });
+        // Validar que la sede del ajuste coincida con la sede del producto
+        if (!producto.getSede().getId().equals(request.getSedeId())) {
+            throw new BadRequestException("El producto pertenece a otra sede");
+        }
 
-        int stockAnterior = stock.getCantidad();
-        int diferencia = request.getCantidadNueva() - stockAnterior;
-
-        // Validar que la cantidad nueva no sea negativa
         if (request.getCantidadNueva() < 0) {
             throw new BadRequestException("La cantidad no puede ser negativa");
         }
 
-        // Actualizar stock
-        stock.setCantidad(request.getCantidadNueva());
-        Stock actualizado = stockRepository.save(stock);
+        int stockAnterior = producto.getStock();
+        int diferencia = request.getCantidadNueva() - stockAnterior;
 
-        // Registrar movimiento en Kardex - RF-039
+        // Actualizar stock
+        producto.setStock(request.getCantidadNueva());
+        Producto actualizado = productoRepository.save(producto);
+
+        // Registrar movimiento en Kardex
         MovimientoKardex movimiento = new MovimientoKardex();
         movimiento.setProducto(producto);
-        movimiento.setSede(sede);
-        movimiento.setTipoMovimiento(
-                diferencia > 0 ?
-                        MovimientoKardex.TipoMovimiento.AJUSTE_POSITIVO :
-                        MovimientoKardex.TipoMovimiento.AJUSTE_NEGATIVO
-        );
+        movimiento.setSede(producto.getSede());
+        movimiento.setTipoMovimiento(diferencia > 0 ? "AJUSTE_POSITIVO" : "AJUSTE_NEGATIVO");
         movimiento.setCantidad(Math.abs(diferencia));
         movimiento.setStockAnterior(stockAnterior);
-        movimiento.setStockNuevo(request.getCantidadNueva());
-        movimiento.setMotivo(request.getMotivo());
+        movimiento.setStockActual(request.getCantidadNueva());
         movimiento.setUsuarioResponsable(usuario);
-        movimiento.setObservaciones(request.getObservaciones());
+        movimiento.setReferenciaTabla(request.getMotivo());
 
         kardexRepository.save(movimiento);
 
-        return convertirADTO(actualizado, producto);
+        return convertirADTO(actualizado);
     }
 
     /**
@@ -164,13 +160,15 @@ public class StockService {
             Producto producto = productoRepository.findById(item.getProductoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado: ID " + item.getProductoId()));
 
-            Stock stock = stockRepository.findByProductoIdAndSedeId(item.getProductoId(), request.getSedeId())
-                    .orElse(null);
+            if (!producto.getSede().getId().equals(request.getSedeId())) {
+                errores.add(String.format("El producto '%s' no pertenece a esta sede", producto.getDescripcion()));
+                continue;
+            }
 
-            if (stock == null || stock.getCantidad() < item.getCantidad()) {
+            if (producto.getStock() < item.getCantidad()) {
                 errores.add(String.format("Stock insuficiente para '%s'. Disponible: %d, Solicitado: %d",
-                        producto.getNombre(),
-                        stock != null ? stock.getCantidad() : 0,
+                        producto.getDescripcion(),
+                        producto.getStock(),
                         item.getCantidad()));
             }
         }
@@ -179,41 +177,43 @@ public class StockService {
             throw new InsufficientStockException("Errores en la salida: " + String.join("; ", errores));
         }
 
+        // Crear cabecera de salida
+        Salida salida = new Salida();
+        salida.setSede(sede);
+        salida.setMotivo(request.getMotivo());
+        salida.setObservacion(request.getObservaciones());
+        salida.setUsuario(usuario);
+        Salida salidaGuardada = salidaRepository.save(salida);
+
         // Registrar salidas
         for (StockDTO.SalidaStockRequest item : request.getProductos()) {
 
             Producto producto = productoRepository.findById(item.getProductoId()).get();
-            Stock stock = stockRepository.findByProductoIdAndSedeId(item.getProductoId(), request.getSedeId()).get();
-
-            int stockAnterior = stock.getCantidad();
+            int stockAnterior = producto.getStock();
             int stockNuevo = stockAnterior - item.getCantidad();
 
             // Actualizar stock
-            stock.setCantidad(stockNuevo);
-            stockRepository.save(stock);
+            producto.setStock(stockNuevo);
+            productoRepository.save(producto);
+
+            // Crear detalle de salida
+            DetalleSalida detalle = new DetalleSalida();
+            detalle.setSalida(salidaGuardada);
+            detalle.setProducto(producto);
+            detalle.setCantidad(item.getCantidad());
+            detalleSalidaRepository.save(detalle);
 
             // Registrar en Kardex
             MovimientoKardex movimiento = new MovimientoKardex();
             movimiento.setProducto(producto);
             movimiento.setSede(sede);
-
-            // Determinar tipo de movimiento según el motivo
-            switch (request.getMotivo().toUpperCase()) {
-                case "VENTA":
-                    movimiento.setTipoMovimiento(MovimientoKardex.TipoMovimiento.SALIDA_VENTA);
-                    break;
-                case "TRASLADO":
-                    movimiento.setTipoMovimiento(MovimientoKardex.TipoMovimiento.TRASLADO_SALIDA);
-                    break;
-                default:
-                    movimiento.setTipoMovimiento(MovimientoKardex.TipoMovimiento.AJUSTE_NEGATIVO);
-            }
+            movimiento.setTipoMovimiento(determinarTipoMovimiento(request.getMotivo()));
             movimiento.setCantidad(item.getCantidad());
             movimiento.setStockAnterior(stockAnterior);
-            movimiento.setStockNuevo(stockNuevo);
-            movimiento.setMotivo(request.getMotivo());
+            movimiento.setStockActual(stockNuevo);
             movimiento.setUsuarioResponsable(usuario);
-            movimiento.setObservaciones(request.getObservaciones());
+            movimiento.setReferenciaTabla("salidas");
+            movimiento.setReferenciaId(salidaGuardada.getId());
 
             kardexRepository.save(movimiento);
         }
@@ -228,67 +228,66 @@ public class StockService {
         Producto producto = productoRepository.findById(productoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        Sede sede = sedeRepository.findById(sedeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
-
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        // Obtener o crear stock
-        Stock stock = stockRepository.findByProductoIdAndSedeId(productoId, sedeId)
-                .orElseGet(() -> {
-                    Stock nuevoStock = new Stock();
-                    nuevoStock.setProducto(producto);
-                    nuevoStock.setSede(sede);
-                    nuevoStock.setCantidad(0);
-                    return nuevoStock;
-                });
+        if (!producto.getSede().getId().equals(sedeId)) {
+            throw new BadRequestException("El producto no pertenece a esta sede");
+        }
 
-        int stockAnterior = stock.getCantidad();
+        int stockAnterior = producto.getStock();
         int stockNuevo = stockAnterior + cantidad;
 
         // Actualizar stock
-        stock.setCantidad(stockNuevo);
-        stockRepository.save(stock);
+        producto.setStock(stockNuevo);
+        productoRepository.save(producto);
 
         // Registrar en Kardex
         MovimientoKardex movimiento = new MovimientoKardex();
         movimiento.setProducto(producto);
-        movimiento.setSede(sede);
-        movimiento.setTipoMovimiento(MovimientoKardex.TipoMovimiento.ENTRADA_COMPRA);
+        movimiento.setSede(producto.getSede());
+        movimiento.setTipoMovimiento("ENTRADA_COMPRA");
         movimiento.setCantidad(cantidad);
         movimiento.setStockAnterior(stockAnterior);
-        movimiento.setStockNuevo(stockNuevo);
-        movimiento.setMotivo("Entrada por compra");
+        movimiento.setStockActual(stockNuevo);
         movimiento.setUsuarioResponsable(usuario);
-        movimiento.setReferencia(referencia);
+        movimiento.setReferenciaTabla(referencia);
 
         kardexRepository.save(movimiento);
     }
 
-    // Convertir entidad a DTO
-    private StockDTO.StockResponse convertirADTO(Stock stock, Producto producto) {
+    // MÉTODOS AUXILIARES
 
-        String estado;
-        if (stock.getCantidad() == 0) {
-            estado = "AGOTADO";
-        } else if (stock.getCantidad() <= producto.getStockMinimo()) {
-            estado = "BAJO";
+    private String determinarTipoMovimiento(String motivo) {
+        return switch (motivo.toUpperCase()) {
+            case "VENTA" -> "SALIDA_VENTA";
+            case "TRASLADO" -> "TRASLADO_SALIDA";
+            default -> "AJUSTE_NEGATIVO";
+        };
+    }
+
+    private String calcularEstadoStock(Producto producto) {
+        if (producto.getStock() == 0) {
+            return "AGOTADO";
+        } else if (producto.getStock() <= producto.getStockMinimo()) {
+            return "BAJO";
         } else {
-            estado = "NORMAL";
+            return "NORMAL";
         }
+    }
 
+    private StockDTO.StockResponse convertirADTO(Producto producto) {
         return new StockDTO.StockResponse(
-                stock.getId(),
                 producto.getId(),
-                producto.getCodigo(),
-                producto.getNombre(),
-                stock.getSede().getId(),
-                stock.getSede().getNombre(),
-                stock.getCantidad(),
+                producto.getId(),
+                producto.getCodigoInterno(),
+                producto.getDescripcion(),
+                producto.getSede().getId(),
+                producto.getSede().getNombre(),
+                producto.getStock(),
                 producto.getStockMinimo(),
-                stock.getFechaActualizacion(),
-                estado
+                producto.getFechaCreacion(),
+                calcularEstadoStock(producto)
         );
     }
 }

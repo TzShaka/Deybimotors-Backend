@@ -6,15 +6,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Entidad Subcategoría - RF-046 a RF-049
- * ✅ CORREGIDO: Visibilidad cambiada a PUBLIC
+ * Entidad ModeloAutomovil
+ * Modelos de automóviles asociados a marcas
  */
 @Entity
-@Table(name = "subcategorias")
+@Table(name = "modelos_automovil")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Subcategoria {
+public class ModeloAutomovil {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,12 +24,6 @@ public class Subcategoria {
     private String nombre;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "categoria_id", nullable = false)
-    private Categoria categoria;
-
-    @Column(length = 500)
-    private String descripcion;
-
-    @Column(nullable = false)
-    private Boolean activo = true;
+    @JoinColumn(name = "marca_automovil_id", nullable = false)
+    private MarcaAutomovil marcaAutomovil;
 }

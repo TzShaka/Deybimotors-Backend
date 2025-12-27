@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * Servicio de Importación - RF-028
- * Importación masiva de productos desde Excel
+ * ✅ CORREGIDO: Eliminadas referencias a campos inexistentes
  */
 @Service
 @RequiredArgsConstructor
@@ -29,11 +29,12 @@ public class ImportService {
     private final CategoriaRepository categoriaRepository;
     private final SubcategoriaRepository subcategoriaRepository;
     private final MarcaRepository marcaRepository;
+    private final SedeRepository sedeRepository;
 
     /**
      * Importar productos desde Excel - RF-028
      * Formato esperado del Excel:
-     * CODIGO | NOMBRE | CATEGORIA | SUBCATEGORIA | MARCA | MARCA_AUTO | MODELO_AUTO | MOTOR | PRECIO_VENTA | STOCK_MINIMO
+     * CODIGO | NOMBRE | CATEGORIA | SUBCATEGORIA | MARCA | PRECIO_VENTA | STOCK_MINIMO | SEDE
      */
     @Transactional
     public ImportResult importarProductosDesdeExcel(MultipartFile archivo) throws IOException {
@@ -58,11 +59,9 @@ public class ImportService {
                 String categoriaNombre = getCellValueAsString(row.getCell(2));
                 String subcategoriaNombre = getCellValueAsString(row.getCell(3));
                 String marcaNombre = getCellValueAsString(row.getCell(4));
-                String marcaAutomovil = getCellValueAsString(row.getCell(5));
-                String modeloAutomovil = getCellValueAsString(row.getCell(6));
-                String motor = getCellValueAsString(row.getCell(7));
-                String precioVentaStr = getCellValueAsString(row.getCell(8));
-                String stockMinimoStr = getCellValueAsString(row.getCell(9));
+                String precioVentaStr = getCellValueAsString(row.getCell(5));
+                String stockMinimoStr = getCellValueAsString(row.getCell(6));
+                String sedeNombre = getCellValueAsString(row.getCell(7));
 
                 // Validaciones básicas
                 if (codigo == null || codigo.isEmpty()) {
@@ -115,33 +114,40 @@ public class ImportService {
                             return marcaRepository.save(nuevaMarca);
                         });
 
+                // Buscar sede
+                Sede sede = sedeRepository.findByNombre(sedeNombre != null ? sedeNombre : "Sede Principal")
+                        .orElseGet(() -> sedeRepository.findAll().stream()
+                                .findFirst()
+                                .orElseThrow(() -> new BadRequestException("No existe ninguna sede")));
+
                 // Crear producto
                 Producto producto = new Producto();
-                producto.setCodigo(codigo);
-                producto.setNombre(nombre);
+                producto.setCodigoInterno(codigo);
+                producto.setDescripcion(nombre);
                 producto.setCategoria(categoria);
                 producto.setSubcategoria(subcategoria);
-                producto.setMarca(marca);
-                producto.setMarcaAutomovil(marcaAutomovil);
-                producto.setModeloAutomovil(modeloAutomovil);
-                producto.setMotor(motor);
+                producto.setMarcaProducto(marca);
+                producto.setSede(sede);
 
                 // Precio de venta
                 try {
-                    producto.setPrecioVenta(new BigDecimal(precioVentaStr));
+                    producto.setPrecioVenta(new BigDecimal(precioVentaStr != null ? precioVentaStr : "0"));
                 } catch (Exception e) {
                     producto.setPrecioVenta(BigDecimal.ZERO);
                 }
 
                 // Stock mínimo
                 try {
-                    producto.setStockMinimo(Integer.parseInt(stockMinimoStr));
+                    producto.setStockMinimo(Integer.parseInt(stockMinimoStr != null ? stockMinimoStr : "0"));
                 } catch (Exception e) {
                     producto.setStockMinimo(0);
                 }
 
-                producto.setActivo(true);
-                producto.setPublicoCatalogo(false);
+                // Stock inicial
+                producto.setStock(0);
+
+                // Estado
+                producto.setEstado(true);
 
                 productoRepository.save(producto);
                 resultado.incrementarExitosos();

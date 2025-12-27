@@ -14,27 +14,82 @@ import java.util.Optional;
 public interface ProductoRepository extends JpaRepository<Producto, Long>,
         JpaSpecificationExecutor<Producto> {
 
-    Optional<Producto> findByCodigo(String codigo);
-    boolean existsByCodigo(String codigo);
-    List<Producto> findByNombreContainingIgnoreCase(String nombre);
-    List<Producto> findByActivoTrue();
+    // Búsqueda por código interno
+    Optional<Producto> findByCodigoInterno(String codigoInterno);
+    boolean existsByCodigoInterno(String codigoInterno);
+
+    // Búsqueda por descripción
+    List<Producto> findByDescripcionContainingIgnoreCase(String descripcion);
+
+    // Productos activos (estado = true)
+    List<Producto> findByEstadoTrue();
+
+    // Por categoría
     List<Producto> findByCategoriaId(Long categoriaId);
-    List<Producto> findByMarcaId(Long marcaId);
 
-    // ✅ MANTENER - Búsqueda por modelo del automóvil (campo de texto)
-    List<Producto> findByModeloAutomovilContainingIgnoreCase(String modeloAutomovil);
+    // Por marca de producto
+    List<Producto> findByMarcaProductoId(Long marcaId);
 
-    List<Producto> findByPublicoCatalogoTrueAndActivoTrue();
+    // Por subcategoría
+    List<Producto> findBySubcategoriaId(Long subcategoriaId);
 
-    @Query("SELECT COUNT(p) FROM Producto p WHERE p.activo = true")
+    // Por sede
+    List<Producto> findBySedeId(Long sedeId);
+
+    // Productos sin stock en una sede específica
+    @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock = 0 AND p.estado = true")
+    List<Producto> findProductosSinStockPorSede(@Param("sedeId") Long sedeId);
+
+    // Productos con stock bajo
+    @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= p.stockMinimo AND p.estado = true")
+    List<Producto> findProductosStockBajoPorSede(@Param("sedeId") Long sedeId);
+
+    // Contar productos activos
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.estado = true")
     long countProductosActivos();
 
-    @Query("SELECT COUNT(p) FROM Producto p WHERE p.categoria.id = :categoriaId AND p.activo = true")
+    // Contar por categoría
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.categoria.id = :categoriaId AND p.estado = true")
     long countByCategoriaId(@Param("categoriaId") Long categoriaId);
 
-    @Query("SELECT COUNT(p) FROM Producto p WHERE p.marca.id = :marcaId AND p.activo = true")
-    long countByMarcaId(@Param("marcaId") Long marcaId);
+    // Contar por marca
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.marcaProducto.id = :marcaId AND p.estado = true")
+    long countByMarcaProductoId(@Param("marcaId") Long marcaId);
 
-    @Query("SELECT COUNT(p) FROM Producto p WHERE p.subcategoria.id = :subcategoriaId AND p.activo = true")
+    // Contar por subcategoría
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.subcategoria.id = :subcategoriaId AND p.estado = true")
     long countBySubcategoriaId(@Param("subcategoriaId") Long subcategoriaId);
+
+    // Contar sin stock en una sede
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock = 0 AND p.estado = true")
+    long countProductosSinStock(@Param("sedeId") Long sedeId);
+
+    // Contar con stock mínimo
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= p.stockMinimo AND p.estado = true")
+    long countProductosStockMinimo(@Param("sedeId") Long sedeId);
+
+    // Métodos de compatibilidad con código existente
+    default Optional<Producto> findByCodigo(String codigo) {
+        return findByCodigoInterno(codigo);
+    }
+
+    default boolean existsByCodigo(String codigo) {
+        return existsByCodigoInterno(codigo);
+    }
+
+    default List<Producto> findByNombreContainingIgnoreCase(String nombre) {
+        return findByDescripcionContainingIgnoreCase(nombre);
+    }
+
+    default List<Producto> findByActivoTrue() {
+        return findByEstadoTrue();
+    }
+
+    default List<Producto> findByMarcaId(Long marcaId) {
+        return findByMarcaProductoId(marcaId);
+    }
+
+    default long countByMarcaId(Long marcaId) {
+        return countByMarcaProductoId(marcaId);
+    }
 }

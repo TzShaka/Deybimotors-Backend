@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Sedes - RF-040 a RF-042
+ * Servicio de Sedes - ✅ ACTUALIZADO
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +52,7 @@ public class SedeService {
 
         Sede sede = new Sede();
         sede.setNombre(request.getNombre());
+        sede.setCodigo(generarCodigo(request.getNombre())); // Generar código automático
         sede.setDireccion(request.getDireccion());
         sede.setCiudad(request.getCiudad());
         sede.setTelefono(request.getTelefono());
@@ -92,13 +93,20 @@ public class SedeService {
         Sede sede = sedeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
 
-        // Validar integridad referencial
         long usuariosAsociados = usuarioRepository.findBySedeId(id).size();
         if (usuariosAsociados > 0) {
             throw new ConflictException("No se puede eliminar la sede porque tiene usuarios asociados");
         }
 
         sedeRepository.delete(sede);
+    }
+
+    private String generarCodigo(String nombre) {
+        // Generar código de 2-3 letras del nombre
+        if (nombre.length() >= 2) {
+            return nombre.substring(0, Math.min(3, nombre.length())).toUpperCase();
+        }
+        return nombre.toUpperCase();
     }
 
     private GenericDTO.SedeResponse convertirADTO(Sede sede) {

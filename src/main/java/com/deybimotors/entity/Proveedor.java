@@ -9,8 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * Entidad Proveedor - RF-043 a RF-045
- * Proveedores de productos
+ * Entidad Proveedor - ✅ ACTUALIZADA para BD real
+ * Campo razon_social → nombre_empresa
  */
 @Entity
 @Table(name = "proveedores")
@@ -23,7 +23,8 @@ public class Proveedor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 200)
+    // ✅ CORRECCIÓN: En BD es nombre_empresa, no razon_social
+    @Column(nullable = false, length = 200, name = "nombre_empresa")
     private String nombreEmpresa;
 
     @Column(unique = true, length = 20)
@@ -45,7 +46,7 @@ public class Proveedor {
     private Boolean activo = true;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
     @Column(length = 500)

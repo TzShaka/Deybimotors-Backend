@@ -10,8 +10,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * Entidad Usuario - RF-001, RF-002
- * Representa los usuarios del sistema con roles y autenticación
+ * Entidad Usuario - ✅ ACTUALIZADA para BD real
+ * Campo rol es VARCHAR (ENUM en Java), NO FK
  */
 @Entity
 @Table(name = "usuarios")
@@ -30,7 +30,7 @@ public class Usuario {
     @Column(nullable = false)
     private String password; // Contraseña encriptada
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 100, name = "nombre_completo")
     private String nombreCompleto;
 
     @Column(length = 100)
@@ -39,6 +39,7 @@ public class Usuario {
     @Column(length = 20)
     private String telefono;
 
+    // ✅ CORRECCIÓN: rol es VARCHAR en BD, NO FK
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Rol rol;
@@ -51,10 +52,11 @@ public class Usuario {
     private Boolean activo = true;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
     @UpdateTimestamp
+    @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
     @Column(length = 500)

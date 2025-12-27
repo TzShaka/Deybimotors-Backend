@@ -8,11 +8,11 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * Entidad CompraDetalle - RF-027, RF-028
- * Detalle de productos en una compra
+ * Entidad CompraDetalle - ✅ ACTUALIZADA para BD real
+ * Campo observaciones agregado por migración
  */
 @Entity
-@Table(name = "compra_detalles")
+@Table(name = "detalle_compras")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,12 +33,19 @@ public class CompraDetalle {
     @Column(nullable = false)
     private Integer cantidad;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(precision = 10, scale = 2, name = "precio_unitario")
     private BigDecimal precioUnitario;
 
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal subtotal;
-
+    // ✅ NUEVO: Campo agregado por migración
     @Column(length = 500)
     private String observaciones;
+
+    // Método calculado para subtotal (NO existe en BD)
+    @Transient
+    public BigDecimal getSubtotal() {
+        if (precioUnitario != null && cantidad != null) {
+            return precioUnitario.multiply(new BigDecimal(cantidad));
+        }
+        return BigDecimal.ZERO;
+    }
 }

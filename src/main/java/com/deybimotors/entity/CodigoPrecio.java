@@ -5,27 +5,29 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 /**
- * Entidad Categoría - ✅ ACTUALIZADA
- * Ahora incluye descripcion y activo
+ * Entidad CodigoPrecio
+ * Códigos de precio para productos
  */
 @Entity
-@Table(name = "categorias")
+@Table(name = "codigos_precio")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Categoria {
+public class CodigoPrecio {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
-    private String nombre;
+    @Column(nullable = false, unique = true, length = 20)
+    private String codigo;
 
-    @Column(length = 500)
+    @Column(length = 100)
     private String descripcion;
 
-    @Column(nullable = false)
-    private Boolean activo = true;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal factor;
 }

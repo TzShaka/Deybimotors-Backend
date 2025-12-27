@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Compras - RF-025 a RF-032
- * Gestión completa de compras y actualización de stock
+ * Servicio de Compras - ✅ ACTUALIZADO
+ * Corregido para trabajar con campos reales de BD
  */
 @Service
 @RequiredArgsConstructor
@@ -34,9 +34,6 @@ public class CompraService {
     private final StockService stockService;
     private final FileStorageService fileStorageService;
 
-    /**
-     * Listar todas las compras - RF-032
-     */
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarTodas() {
         return compraRepository.findAll().stream()
@@ -44,9 +41,6 @@ public class CompraService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar últimas compras
-     */
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarUltimas() {
         return compraRepository.findTop10ByOrderByFechaRegistroDesc().stream()
@@ -54,9 +48,6 @@ public class CompraService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar compras por estado - RF-032
-     */
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarPorEstado(String estado) {
         Compra.EstadoCompra estadoCompra = Compra.EstadoCompra.valueOf(estado.toUpperCase());
@@ -65,9 +56,6 @@ public class CompraService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar compras por proveedor
-     */
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarPorProveedor(Long proveedorId) {
         return compraRepository.findByProveedorId(proveedorId).stream()
@@ -75,9 +63,6 @@ public class CompraService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar compras por sede
-     */
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarPorSede(Long sedeId) {
         return compraRepository.findBySedeId(sedeId).stream()
@@ -85,9 +70,6 @@ public class CompraService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar compras por rango de fechas - RF-032
-     */
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarPorFechas(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
         return compraRepository.findByFechaRegistroBetween(fechaInicio, fechaFin).stream()
@@ -95,9 +77,6 @@ public class CompraService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Obtener compra por ID
-     */
     @Transactional(readOnly = true)
     public CompraDTO.CompraResponse obtenerPorId(Long id) {
         Compra compra = compraRepository.findById(id)
@@ -111,19 +90,15 @@ public class CompraService {
     @Transactional
     public CompraDTO.CompraResponse crear(CompraDTO.CrearCompraRequest request, Long usuarioId) {
 
-        // Validar proveedor
         Proveedor proveedor = proveedorRepository.findById(request.getProveedorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Proveedor no encontrado"));
 
-        // Validar sede
         Sede sede = sedeRepository.findById(request.getSedeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
 
-        // Validar usuario
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        // Validar que haya detalles
         if (request.getDetalles() == null || request.getDetalles().isEmpty()) {
             throw new BadRequestException("La compra debe tener al menos un producto");
         }
@@ -145,17 +120,14 @@ public class CompraService {
             Producto producto = productoRepository.findById(detalleRequest.getProductoId())
                     .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado: ID " + detalleRequest.getProductoId()));
 
-            // Calcular subtotal
             BigDecimal subtotal = detalleRequest.getPrecioUnitario()
                     .multiply(new BigDecimal(detalleRequest.getCantidad()));
 
-            // Crear detalle
             CompraDetalle detalle = new CompraDetalle();
             detalle.setCompra(compra);
             detalle.setProducto(producto);
             detalle.setCantidad(detalleRequest.getCantidad());
             detalle.setPrecioUnitario(detalleRequest.getPrecioUnitario());
-            detalle.setSubtotal(subtotal);
             detalle.setObservaciones(detalleRequest.getObservaciones());
 
             compra.getDetalles().add(detalle);
@@ -164,7 +136,6 @@ public class CompraService {
 
         compra.setMontoTotal(montoTotal);
 
-        // Guardar compra
         Compra guardada = compraRepository.save(compra);
 
         return convertirADTO(guardada);
@@ -179,10 +150,8 @@ public class CompraService {
         Compra compra = compraRepository.findById(compraId)
                 .orElseThrow(() -> new ResourceNotFoundException("Compra no encontrada"));
 
-        // Guardar archivo
         String rutaArchivo = fileStorageService.guardarDocumento(archivo, "facturas");
 
-        // Actualizar compra
         compra.setRutaFactura(rutaArchivo);
         compraRepository.save(compra);
     }
@@ -200,7 +169,6 @@ public class CompraService {
         Compra.EstadoCompra estadoAnterior = compra.getEstado();
         Compra.EstadoCompra estadoNuevo = Compra.EstadoCompra.valueOf(request.getEstado().toUpperCase());
 
-        // Validar transición de estados
         if (estadoAnterior == Compra.EstadoCompra.COMPLETADO) {
             throw new BadRequestException("No se puede modificar una compra completada");
         }
@@ -209,7 +177,7 @@ public class CompraService {
             throw new BadRequestException("No se puede modificar una compra cancelada");
         }
 
-        // Si el nuevo estado es COMPLETADO, actualizar stock - RF-030
+        // Si el nuevo estado es COMPLETADO, actualizar stock
         if (estadoNuevo == Compra.EstadoCompra.COMPLETADO && estadoAnterior != Compra.EstadoCompra.COMPLETADO) {
 
             for (CompraDetalle detalle : compra.getDetalles()) {
@@ -223,7 +191,6 @@ public class CompraService {
             }
         }
 
-        // Actualizar estado
         compra.setEstado(estadoNuevo);
         Compra actualizada = compraRepository.save(compra);
 
@@ -239,17 +206,14 @@ public class CompraService {
         Compra compra = compraRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Compra no encontrada"));
 
-        // Solo permitir eliminar si está pendiente
         if (compra.getEstado() != Compra.EstadoCompra.PENDIENTE) {
             throw new BadRequestException("Solo se pueden eliminar compras en estado PENDIENTE");
         }
 
-        // Eliminar archivo de factura si existe
         if (compra.getRutaFactura() != null) {
             fileStorageService.eliminarArchivo(compra.getRutaFactura());
         }
 
-        // Eliminar compra (los detalles se eliminan en cascada)
         compraRepository.delete(compra);
     }
 

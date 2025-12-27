@@ -14,8 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Servicio de Dashboard - RF-003
- * Proporciona datos consolidados para el dashboard principal
+ * Servicio de Dashboard - ✅ ACTUALIZADO
+ * Trabaja con stock en tabla productos
  */
 @Service
 @RequiredArgsConstructor
@@ -23,7 +23,6 @@ public class DashboardService {
 
     private final ProductoRepository productoRepository;
     private final CategoriaRepository categoriaRepository;
-    private final StockRepository stockRepository;
     private final MovimientoKardexRepository kardexRepository;
     private final CompraRepository compraRepository;
 
@@ -38,11 +37,11 @@ public class DashboardService {
         // Total de productos registrados
         long totalProductos = productoRepository.countProductosActivos();
 
-        // Productos sin stock
-        long productosSinStock = stockRepository.countProductosSinStock(sedeId);
+        // Productos sin stock en la sede
+        long productosSinStock = productoRepository.countProductosSinStock(sedeId);
 
-        // Productos con stock mínimo
-        long productosStockMinimo = stockRepository.countProductosStockMinimo(sedeId);
+        // Productos con stock mínimo en la sede
+        long productosStockMinimo = productoRepository.countProductosStockMinimo(sedeId);
 
         // Total de categorías
         long totalCategorias = categoriaRepository.count();
@@ -63,9 +62,6 @@ public class DashboardService {
         );
     }
 
-    /**
-     * Obtener últimas actualizaciones del sistema
-     */
     private List<DashboardDTO.UltimaActualizacion> obtenerUltimasActualizaciones() {
 
         List<DashboardDTO.UltimaActualizacion> actualizaciones = new ArrayList<>();
@@ -91,9 +87,9 @@ public class DashboardService {
         for (Producto producto : ultimosProductos) {
             actualizaciones.add(new DashboardDTO.UltimaActualizacion(
                     "PRODUCTO",
-                    "Nuevo producto: " + producto.getNombre(),
+                    "Nuevo producto: " + producto.getDescripcion(),
                     producto.getFechaCreacion().format(DATE_FORMATTER),
-                    producto.getUsuarioCreacion() != null ? producto.getUsuarioCreacion().getNombreCompleto() : "Sistema"
+                    "Sistema"
             ));
         }
 
@@ -102,9 +98,6 @@ public class DashboardService {
         return actualizaciones.stream().limit(10).toList();
     }
 
-    /**
-     * Obtener movimientos recientes del Kardex
-     */
     private List<DashboardDTO.Movimiento> obtenerMovimientosRecientes() {
 
         List<MovimientoKardex> movimientos = kardexRepository.findTop50ByOrderByFechaMovimientoDesc();
@@ -113,7 +106,7 @@ public class DashboardService {
                 .limit(10)
                 .map(m -> new DashboardDTO.Movimiento(
                         traducirTipoMovimiento(m.getTipoMovimiento()),
-                        m.getProducto().getNombre(),
+                        m.getProducto().getDescripcion(),
                         m.getCantidad(),
                         m.getSede().getNombre(),
                         m.getFechaMovimiento().format(DATE_FORMATTER)
@@ -121,19 +114,17 @@ public class DashboardService {
                 .toList();
     }
 
-    /**
-     * Traducir tipo de movimiento a texto legible
-     */
-    private String traducirTipoMovimiento(MovimientoKardex.TipoMovimiento tipo) {
+    private String traducirTipoMovimiento(String tipo) {
         return switch (tipo) {
-            case ENTRADA_COMPRA -> "Entrada por Compra";
-            case SALIDA_VENTA -> "Salida por Venta";
-            case AJUSTE_POSITIVO -> "Ajuste Positivo";
-            case AJUSTE_NEGATIVO -> "Ajuste Negativo";
-            case TRASLADO_ENTRADA -> "Traslado (Entrada)";
-            case TRASLADO_SALIDA -> "Traslado (Salida)";
-            case DEVOLUCION -> "Devolución";
-            case MERMA -> "Merma";
+            case "ENTRADA_COMPRA" -> "Entrada por Compra";
+            case "SALIDA_VENTA" -> "Salida por Venta";
+            case "AJUSTE_POSITIVO" -> "Ajuste Positivo";
+            case "AJUSTE_NEGATIVO" -> "Ajuste Negativo";
+            case "TRASLADO_ENTRADA" -> "Traslado (Entrada)";
+            case "TRASLADO_SALIDA" -> "Traslado (Salida)";
+            case "DEVOLUCION" -> "Devolución";
+            case "MERMA" -> "Merma";
+            default -> tipo;
         };
     }
 }

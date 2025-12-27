@@ -6,11 +6,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Entidad Marca - RF-050 a RF-053
- * Marcas de productos
+ * Entidad Marca - ✅ CORREGIDO
+ * Tabla: marcas_producto (nombre real en BD)
  */
 @Entity
-@Table(name = "marcas")
+@Table(name = "marcas_producto") // ✅ CORREGIDO: Nombre real de la tabla en BD
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

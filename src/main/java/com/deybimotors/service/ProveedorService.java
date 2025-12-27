@@ -108,7 +108,6 @@ public class ProveedorService {
         Proveedor proveedor = proveedorRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Proveedor no encontrado"));
 
-        // Validar integridad referencial - RF-045
         long comprasAsociadas = compraRepository.findByProveedorId(id).size();
         if (comprasAsociadas > 0) {
             throw new ConflictException("No se puede eliminar el proveedor porque tiene compras asociadas");

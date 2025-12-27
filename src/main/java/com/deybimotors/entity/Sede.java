@@ -9,8 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * Entidad Sede - RF-040 a RF-042
- * Representa las sedes/sucursales de DebyMotors
+ * Entidad Sede - ✅ ACTUALIZADA para BD real
+ * Ahora incluye todos los campos necesarios
  */
 @Entity
 @Table(name = "sedes")
@@ -26,6 +26,9 @@ public class Sede {
     @Column(nullable = false, unique = true, length = 100)
     private String nombre;
 
+    @Column(nullable = false, unique = true, length = 10)
+    private String codigo;
+
     @Column(length = 200)
     private String direccion;
 
@@ -39,7 +42,7 @@ public class Sede {
     private Boolean activo = true;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
     @Column(length = 500)

@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Compra - RF-025 a RF-032
- * Cabecera de compra de productos
+ * Entidad Compra - ✅ ACTUALIZADA para BD real
+ * Campos corregidos según estructura real de BD
  */
 @Entity
 @Table(name = "compras")
@@ -27,8 +27,9 @@ public class Compra {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
-    private String numeroCompra; // Generado automáticamente
+    // ✅ CORRECCIÓN: numero_compra en BD (antes numero_factura)
+    @Column(nullable = false, unique = true, length = 50, name = "numero_compra")
+    private String numeroCompra;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "proveedor_id", nullable = false)
@@ -38,25 +39,29 @@ public class Compra {
     @JoinColumn(name = "sede_id", nullable = false)
     private Sede sede;
 
-    @Column(length = 500)
-    private String rutaFactura; // Documento de factura subido
+    // ✅ CORRECCIÓN: ruta_factura en BD (antes archivo_factura_url)
+    @Column(length = 500, name = "ruta_factura")
+    private String rutaFactura;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoCompra estado = EstadoCompra.PENDIENTE;
 
-    @Column(nullable = false, precision = 12, scale = 2)
+    // ✅ NUEVO: Campo agregado por migración
+    @Column(nullable = false, precision = 12, scale = 2, name = "monto_total")
     private BigDecimal montoTotal = BigDecimal.ZERO;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "usuario_registro_id", nullable = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuarioRegistro;
 
+    // ✅ CORRECCIÓN: fecha_registro en BD (antes fecha_creacion)
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaRegistro;
 
     @UpdateTimestamp
+    @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
     @Column(length = 1000)

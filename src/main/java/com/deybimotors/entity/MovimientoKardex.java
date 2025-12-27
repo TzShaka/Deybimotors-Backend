@@ -10,13 +10,13 @@ import java.time.LocalDateTime;
 
 /**
  * Entidad MovimientoKardex - RF-033 a RF-039
- * Registro de todos los movimientos de inventario
+ * TABLA: kardex (según BD)
  */
 @Entity
-@Table(name = "movimientos_kardex", indexes = {
+@Table(name = "kardex", indexes = {
         @Index(name = "idx_producto", columnList = "producto_id"),
-        @Index(name = "idx_fecha", columnList = "fechaMovimiento"),
-        @Index(name = "idx_tipo", columnList = "tipoMovimiento")
+        @Index(name = "idx_fecha", columnList = "fecha_movimiento"),
+        @Index(name = "idx_tipo", columnList = "tipo_movimiento")
 })
 @Data
 @NoArgsConstructor
@@ -28,52 +28,82 @@ public class MovimientoKardex {
     private Long id;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "producto_id", nullable = false)
+    @JoinColumn(name = "producto_id")
     private Producto producto;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "sede_id", nullable = false)
+    @JoinColumn(name = "sede_id")
     private Sede sede;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private TipoMovimiento tipoMovimiento;
+    @Column(length = 20, name = "tipo_movimiento")
+    private String tipoMovimiento;
 
-    @Column(nullable = false)
+    @Column(length = 50, name = "referencia_tabla")
+    private String referenciaTabla;
+
+    @Column(name = "referencia_id")
+    private Long referenciaId;
+
+    @Column
     private Integer cantidad;
 
-    @Column(nullable = false)
+    @Column(name = "stock_anterior")
     private Integer stockAnterior;
 
-    @Column(nullable = false)
-    private Integer stockNuevo;
-
-    @Column(length = 500)
-    private String motivo;
+    @Column(name = "stock_actual")
+    private Integer stockActual;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "usuario_responsable_id", nullable = false)
+    @JoinColumn(name = "usuario_id")
     private Usuario usuarioResponsable;
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false, name = "fecha_movimiento")
     private LocalDateTime fechaMovimiento;
 
-    @Column(length = 50)
-    private String referencia; // Número de compra, venta, etc.
+    // Métodos de compatibilidad con código existente
+    public Integer getStockNuevo() {
+        return this.stockActual;
+    }
 
-    @Column(length = 1000)
-    private String observaciones;
+    public void setStockNuevo(Integer stock) {
+        this.stockActual = stock;
+    }
 
-    // Tipos de movimiento
+    public String getMotivo() {
+        return this.tipoMovimiento;
+    }
+
+    public void setMotivo(String motivo) {
+        this.tipoMovimiento = motivo;
+    }
+
+    public String getReferencia() {
+        return this.referenciaTabla;
+    }
+
+    public void setReferencia(String ref) {
+        this.referenciaTabla = ref;
+    }
+
+    public String getObservaciones() {
+        // No existe en BD, retornar null
+        return null;
+    }
+
+    public void setObservaciones(String obs) {
+        // No hacer nada, no existe en BD
+    }
+
+    // Enum para tipos de movimiento
     public enum TipoMovimiento {
-        ENTRADA_COMPRA,      // Entrada por compra
-        SALIDA_VENTA,        // Salida por venta
-        AJUSTE_POSITIVO,     // Ajuste manual positivo
-        AJUSTE_NEGATIVO,     // Ajuste manual negativo
-        TRASLADO_ENTRADA,    // Entrada por traslado
-        TRASLADO_SALIDA,     // Salida por traslado
-        DEVOLUCION,          // Devolución de cliente
-        MERMA                // Pérdida/daño de producto
+        ENTRADA_COMPRA,
+        SALIDA_VENTA,
+        AJUSTE_POSITIVO,
+        AJUSTE_NEGATIVO,
+        TRASLADO_ENTRADA,
+        TRASLADO_SALIDA,
+        DEVOLUCION,
+        MERMA
     }
 }

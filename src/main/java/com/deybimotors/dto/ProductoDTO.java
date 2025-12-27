@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO para Producto - ACTUALIZADO con todos los campos
+ * DTO para Producto - ACTUALIZADO con sedeId
  */
 public class ProductoDTO {
 
@@ -94,6 +94,10 @@ public class ProductoDTO {
 
         @NotNull(message = "La marca es obligatoria")
         private Long marcaId;
+
+        // ✅ NUEVO: Sede obligatoria
+        @NotNull(message = "La sede es obligatoria")
+        private Long sedeId;
 
         // Datos del vehículo
         private String marcaAutomovil;

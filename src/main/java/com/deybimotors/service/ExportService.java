@@ -2,10 +2,8 @@ package com.deybimotors.service;
 
 import com.deybimotors.entity.MovimientoKardex;
 import com.deybimotors.entity.Producto;
-import com.deybimotors.entity.Stock;
 import com.deybimotors.repository.MovimientoKardexRepository;
 import com.deybimotors.repository.ProductoRepository;
-import com.deybimotors.repository.StockRepository;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -30,7 +28,7 @@ import java.util.List;
 
 /**
  * Servicio de Exportaciones - RF-016, RF-017, RF-038
- * Exportación de reportes a Excel y PDF
+ * ACTUALIZADO: Trabaja con stock en tabla productos
  */
 @Service
 @RequiredArgsConstructor
@@ -38,10 +36,10 @@ import java.util.List;
 public class ExportService {
 
     private final ProductoRepository productoRepository;
-    private final StockRepository stockRepository;
     private final MovimientoKardexRepository kardexRepository;
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     /**
      * Exportar lista de productos a Excel - RF-016
@@ -49,7 +47,9 @@ public class ExportService {
     @Transactional(readOnly = true)
     public byte[] exportarProductosExcel(Long sedeId) throws IOException {
 
-        List<Producto> productos = productoRepository.findByActivoTrue();
+        List<Producto> productos = sedeId != null
+                ? productoRepository.findBySedeId(sedeId)
+                : productoRepository.findByEstadoTrue();
 
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Productos");
@@ -65,12 +65,11 @@ public class ExportService {
         // Cabecera
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
-                "Código", "Nombre", "Categoría", "Marca", "Marca Auto",
-                "Modelo Auto", "Motor", "Stock", "Precio Venta"
+                "Código", "Descripción", "Categoría", "Marca", "Stock", "Stock Mínimo", "Precio Venta", "Sede"
         };
 
         for (int i = 0; i < columnas.length; i++) {
-            org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+            Cell cell = headerRow.createCell(i);
             cell.setCellValue(columnas[i]);
             cell.setCellStyle(headerStyle);
         }
@@ -78,32 +77,18 @@ public class ExportService {
         // Datos
         int rowNum = 1;
         for (Producto producto : productos) {
-
             Row row = sheet.createRow(rowNum++);
-
-            // Stock de la sede
-            Integer stock = 0;
-            if (sedeId != null) {
-                Stock s = stockRepository.findByProductoIdAndSedeId(producto.getId(), sedeId).orElse(null);
-                stock = s != null ? s.getCantidad() : 0;
-            } else {
-                // Stock total
-                List<Stock> stocks = stockRepository.findByProductoId(producto.getId());
-                stock = stocks.stream().mapToInt(Stock::getCantidad).sum();
-            }
-
-            row.createCell(0).setCellValue(producto.getCodigo());
-            row.createCell(1).setCellValue(producto.getNombre());
+            row.createCell(0).setCellValue(producto.getCodigoInterno());
+            row.createCell(1).setCellValue(producto.getDescripcion());
             row.createCell(2).setCellValue(producto.getCategoria().getNombre());
-            row.createCell(3).setCellValue(producto.getMarca().getNombre());
-            row.createCell(4).setCellValue(producto.getMarcaAutomovil() != null ? producto.getMarcaAutomovil() : "");
-            row.createCell(5).setCellValue(producto.getModeloAutomovil() != null ? producto.getModeloAutomovil() : "");
-            row.createCell(6).setCellValue(producto.getMotor() != null ? producto.getMotor() : "");
-            row.createCell(7).setCellValue(stock);
-            row.createCell(8).setCellValue(producto.getPrecioVenta().doubleValue());
+            row.createCell(3).setCellValue(producto.getMarcaProducto().getNombre());
+            row.createCell(4).setCellValue(producto.getStock());
+            row.createCell(5).setCellValue(producto.getStockMinimo());
+            row.createCell(6).setCellValue(producto.getPrecioVenta().doubleValue());
+            row.createCell(7).setCellValue(producto.getSede().getNombre());
         }
 
-        // Ajustar ancho de columnas
+        // Ajustar columnas
         for (int i = 0; i < columnas.length; i++) {
             sheet.autoSizeColumn(i);
         }
@@ -113,7 +98,6 @@ public class ExportService {
         workbook.close();
 
         log.info("Productos exportados a Excel: {} registros", productos.size());
-
         return baos.toByteArray();
     }
 
@@ -123,7 +107,7 @@ public class ExportService {
     @Transactional(readOnly = true)
     public byte[] exportarProductosStockBajoExcel(Long sedeId) throws IOException {
 
-        List<Stock> stocks = stockRepository.findProductosStockBajoPorSede(sedeId);
+        List<Producto> productos = productoRepository.findProductosStockBajoPorSede(sedeId);
 
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Productos Stock Bajo");
@@ -139,33 +123,29 @@ public class ExportService {
         // Cabecera
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
-                "Código", "Nombre", "Categoría", "Stock Actual", "Stock Mínimo", "Diferencia"
+                "Código", "Descripción", "Categoría", "Stock Actual", "Stock Mínimo", "Diferencia"
         };
 
         for (int i = 0; i < columnas.length; i++) {
-            org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+            Cell cell = headerRow.createCell(i);
             cell.setCellValue(columnas[i]);
             cell.setCellStyle(headerStyle);
         }
 
         // Datos
         int rowNum = 1;
-        for (Stock stock : stocks) {
-
-            Producto producto = stock.getProducto();
+        for (Producto producto : productos) {
             Row row = sheet.createRow(rowNum++);
+            int diferencia = producto.getStockMinimo() - producto.getStock();
 
-            int diferencia = producto.getStockMinimo() - stock.getCantidad();
-
-            row.createCell(0).setCellValue(producto.getCodigo());
-            row.createCell(1).setCellValue(producto.getNombre());
+            row.createCell(0).setCellValue(producto.getCodigoInterno());
+            row.createCell(1).setCellValue(producto.getDescripcion());
             row.createCell(2).setCellValue(producto.getCategoria().getNombre());
-            row.createCell(3).setCellValue(stock.getCantidad());
+            row.createCell(3).setCellValue(producto.getStock());
             row.createCell(4).setCellValue(producto.getStockMinimo());
             row.createCell(5).setCellValue(diferencia);
         }
 
-        // Ajustar ancho de columnas
         for (int i = 0; i < columnas.length; i++) {
             sheet.autoSizeColumn(i);
         }
@@ -174,8 +154,7 @@ public class ExportService {
         workbook.write(baos);
         workbook.close();
 
-        log.info("Productos con stock bajo exportados: {} registros", stocks.size());
-
+        log.info("Productos con stock bajo exportados: {} registros", productos.size());
         return baos.toByteArray();
     }
 
@@ -183,22 +162,19 @@ public class ExportService {
      * Exportar kardex a PDF - RF-038
      */
     @Transactional(readOnly = true)
-    public byte[] exportarKardexPDF(Long productoId, LocalDateTime fechaInicio, LocalDateTime fechaFin) throws IOException {
+    public byte[] exportarKardexPDF(Long productoId, LocalDateTime fechaInicio, LocalDateTime fechaFin)
+            throws IOException {
 
         List<MovimientoKardex> movimientos;
 
         if (productoId != null) {
-            if (fechaInicio != null && fechaFin != null) {
-                movimientos = kardexRepository.findByProductoAndFechas(productoId, fechaInicio, fechaFin);
-            } else {
-                movimientos = kardexRepository.findByProductoIdOrderByFechaMovimientoDesc(productoId);
-            }
+            movimientos = (fechaInicio != null && fechaFin != null)
+                    ? kardexRepository.findByProductoAndFechas(productoId, fechaInicio, fechaFin)
+                    : kardexRepository.findByProductoIdOrderByFechaMovimientoDesc(productoId);
         } else {
-            if (fechaInicio != null && fechaFin != null) {
-                movimientos = kardexRepository.findByFechaMovimientoBetween(fechaInicio, fechaFin);
-            } else {
-                movimientos = kardexRepository.findTop50ByOrderByFechaMovimientoDesc();
-            }
+            movimientos = (fechaInicio != null && fechaFin != null)
+                    ? kardexRepository.findByFechaMovimientoBetween(fechaInicio, fechaFin)
+                    : kardexRepository.findTop50ByOrderByFechaMovimientoDesc();
         }
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -216,9 +192,8 @@ public class ExportService {
         // Subtítulo con fechas
         if (fechaInicio != null && fechaFin != null) {
             Paragraph subtitulo = new Paragraph(
-                    String.format("Periodo: %s - %s",
-                            fechaInicio.format(DATE_FORMATTER),
-                            fechaFin.format(DATE_FORMATTER))
+                    "Periodo: " + fechaInicio.format(DATE_FORMATTER)
+                            + " - " + fechaFin.format(DATE_FORMATTER)
             ).setFontSize(10).setTextAlignment(TextAlignment.CENTER);
             document.add(subtitulo);
         }
@@ -226,55 +201,65 @@ public class ExportService {
         document.add(new Paragraph("\n"));
 
         // Tabla
-        float[] columnWidths = {8, 15, 12, 12, 8, 8, 8, 15, 14};
+        float[] columnWidths = {8, 15, 12, 12, 8, 8, 8, 15};
         Table table = new Table(UnitValue.createPercentArray(columnWidths));
         table.setWidth(UnitValue.createPercentValue(100));
 
-        // Cabecera
         String[] headers = {
-                "Fecha", "Producto", "Sede", "Tipo", "Cant.", "Stock Ant.", "Stock Nvo.", "Usuario", "Motivo"
+                "Fecha", "Producto", "Sede", "Tipo", "Cant.", "Stock Ant.", "Stock Nvo.", "Usuario"
         };
 
         for (String header : headers) {
-            com.itextpdf.layout.element.Cell cell = new com.itextpdf.layout.element.Cell()
-                    .add(new Paragraph(header).setBold())
-                    .setBackgroundColor(ColorConstants.LIGHT_GRAY)
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8);
+            com.itextpdf.layout.element.Cell cell =
+                    new com.itextpdf.layout.element.Cell()
+                            .add(new Paragraph(header).setBold())
+                            .setBackgroundColor(ColorConstants.LIGHT_GRAY)
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setFontSize(8);
             table.addHeaderCell(cell);
         }
 
-        // Datos
-        for (MovimientoKardex movimiento : movimientos) {
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(movimiento.getFechaMovimiento().format(DATE_FORMATTER))).setFontSize(7));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(movimiento.getProducto().getNombre())).setFontSize(7));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(movimiento.getSede().getNombre())).setFontSize(7));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(traducirTipo(movimiento.getTipoMovimiento()))).setFontSize(7));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(movimiento.getCantidad()))).setFontSize(7).setTextAlignment(TextAlignment.CENTER));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(movimiento.getStockAnterior()))).setFontSize(7).setTextAlignment(TextAlignment.CENTER));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(movimiento.getStockNuevo()))).setFontSize(7).setTextAlignment(TextAlignment.CENTER));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(movimiento.getUsuarioResponsable().getNombreCompleto())).setFontSize(7));
-            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(movimiento.getMotivo() != null ? movimiento.getMotivo() : "-")).setFontSize(7));
+        for (MovimientoKardex m : movimientos) {
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(m.getFechaMovimiento().format(DATE_FORMATTER))).setFontSize(7));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(m.getProducto().getDescripcion())).setFontSize(7));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(m.getSede().getNombre())).setFontSize(7));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(traducirTipo(m.getTipoMovimiento()))).setFontSize(7));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(String.valueOf(m.getCantidad()))).setFontSize(7).setTextAlignment(TextAlignment.CENTER));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(String.valueOf(m.getStockAnterior()))).setFontSize(7).setTextAlignment(TextAlignment.CENTER));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(String.valueOf(m.getStockActual()))).setFontSize(7).setTextAlignment(TextAlignment.CENTER));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(
+                            m.getUsuarioResponsable() != null
+                                    ? m.getUsuarioResponsable().getNombreCompleto()
+                                    : "Sistema"
+                    )).setFontSize(7));
         }
 
         document.add(table);
         document.close();
 
         log.info("Kardex exportado a PDF: {} movimientos", movimientos.size());
-
         return baos.toByteArray();
     }
 
-    private String traducirTipo(MovimientoKardex.TipoMovimiento tipo) {
+    private String traducirTipo(String tipo) {
         return switch (tipo) {
-            case ENTRADA_COMPRA -> "Entrada Compra";
-            case SALIDA_VENTA -> "Salida Venta";
-            case AJUSTE_POSITIVO -> "Ajuste +";
-            case AJUSTE_NEGATIVO -> "Ajuste -";
-            case TRASLADO_ENTRADA -> "Traslado Entrada";
-            case TRASLADO_SALIDA -> "Traslado Salida";
-            case DEVOLUCION -> "Devolución";
-            case MERMA -> "Merma";
+            case "ENTRADA_COMPRA" -> "Entrada Compra";
+            case "SALIDA_VENTA" -> "Salida Venta";
+            case "AJUSTE_POSITIVO" -> "Ajuste +";
+            case "AJUSTE_NEGATIVO" -> "Ajuste -";
+            case "TRASLADO_ENTRADA" -> "Traslado Entrada";
+            case "TRASLADO_SALIDA" -> "Traslado Salida";
+            case "DEVOLUCION" -> "Devolución";
+            case "MERMA" -> "Merma";
+            default -> tipo;
         };
     }
 }

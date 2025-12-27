@@ -11,33 +11,30 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Repositorio Compra - RF-025 a RF-032
+ * Repositorio Compra - ✅ ACTUALIZADO
+ * Query corregida para campo numero_compra
  */
 @Repository
 public interface CompraRepository extends JpaRepository<Compra, Long> {
 
     Optional<Compra> findByNumeroCompra(String numeroCompra);
 
-    // Listar compras por proveedor
     List<Compra> findByProveedorId(Long proveedorId);
 
-    // Listar compras por sede
     List<Compra> findBySedeId(Long sedeId);
 
-    // Listar compras por estado
     List<Compra> findByEstado(Compra.EstadoCompra estado);
 
-    // Listar compras por rango de fechas
     @Query("SELECT c FROM Compra c WHERE c.fechaRegistro BETWEEN :fechaInicio AND :fechaFin ORDER BY c.fechaRegistro DESC")
     List<Compra> findByFechaRegistroBetween(
             @Param("fechaInicio") LocalDateTime fechaInicio,
             @Param("fechaFin") LocalDateTime fechaFin
     );
 
-    // Últimas compras
     List<Compra> findTop10ByOrderByFechaRegistroDesc();
 
-    // Generar número de compra automático
-    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(c.numeroCompra, 4) AS integer)), 0) FROM Compra c WHERE c.numeroCompra LIKE CONCAT('CMP', :year, '%')")
+    // ✅ CORRECCIÓN: Query corregida para formato CMP-2024-0001
+    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(c.numeroCompra, 10) AS integer)), 0) " +
+            "FROM Compra c WHERE c.numeroCompra LIKE CONCAT('CMP-', :year, '-%')")
     Integer findUltimoNumeroCompraDelAnio(@Param("year") String year);
 }

@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 /**
  * Servicio de Kardex - RF-033 a RF-039
- * Historial completo de movimientos de inventario
+ * ACTUALIZADO: Compatible con estructura de BD
  */
 @Service
 @RequiredArgsConstructor
@@ -21,9 +21,6 @@ public class KardexService {
 
     private final MovimientoKardexRepository kardexRepository;
 
-    /**
-     * Kardex general - RF-033
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarTodos() {
         return kardexRepository.findTop50ByOrderByFechaMovimientoDesc().stream()
@@ -31,9 +28,6 @@ public class KardexService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kardex por producto - RF-034
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarPorProducto(Long productoId) {
         return kardexRepository.findByProductoIdOrderByFechaMovimientoDesc(productoId).stream()
@@ -41,9 +35,6 @@ public class KardexService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kardex por sede
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarPorSede(Long sedeId) {
         return kardexRepository.findBySedeIdOrderByFechaMovimientoDesc(sedeId).stream()
@@ -51,20 +42,19 @@ public class KardexService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kardex por tipo de movimiento - RF-036
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarPorTipo(String tipo) {
-        MovimientoKardex.TipoMovimiento tipoMovimiento = MovimientoKardex.TipoMovimiento.valueOf(tipo.toUpperCase());
-        return kardexRepository.findByTipoMovimientoOrderByFechaMovimientoDesc(tipoMovimiento).stream()
+        // Como ahora tipo_movimiento es VARCHAR, buscamos por String directamente
+        List<MovimientoKardex> movimientos = kardexRepository.findAll().stream()
+                .filter(m -> m.getTipoMovimiento().equalsIgnoreCase(tipo))
+                .sorted((m1, m2) -> m2.getFechaMovimiento().compareTo(m1.getFechaMovimiento()))
+                .collect(Collectors.toList());
+
+        return movimientos.stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kardex por rango de fechas - RF-035
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarPorFechas(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
         return kardexRepository.findByFechaMovimientoBetween(fechaInicio, fechaFin).stream()
@@ -72,9 +62,6 @@ public class KardexService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kardex filtrado por producto y fechas
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarPorProductoYFechas(
             Long productoId,
@@ -86,12 +73,14 @@ public class KardexService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kardex por usuario responsable - RF-037
-     */
     @Transactional(readOnly = true)
     public List<KardexDTO.MovimientoResponse> listarPorUsuario(Long usuarioId) {
-        return kardexRepository.findByUsuarioResponsableIdOrderByFechaMovimientoDesc(usuarioId).stream()
+        List<MovimientoKardex> movimientos = kardexRepository.findAll().stream()
+                .filter(m -> m.getUsuarioResponsable() != null && m.getUsuarioResponsable().getId().equals(usuarioId))
+                .sorted((m1, m2) -> m2.getFechaMovimiento().compareTo(m1.getFechaMovimiento()))
+                .collect(Collectors.toList());
+
+        return movimientos.stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
@@ -100,33 +89,34 @@ public class KardexService {
         return new KardexDTO.MovimientoResponse(
                 movimiento.getId(),
                 movimiento.getProducto().getId(),
-                movimiento.getProducto().getCodigo(),
-                movimiento.getProducto().getNombre(),
+                movimiento.getProducto().getCodigoInterno(),
+                movimiento.getProducto().getDescripcion(),
                 movimiento.getSede().getId(),
                 movimiento.getSede().getNombre(),
-                movimiento.getTipoMovimiento().name(),
+                movimiento.getTipoMovimiento(),
                 traducirTipoMovimiento(movimiento.getTipoMovimiento()),
                 movimiento.getCantidad(),
                 movimiento.getStockAnterior(),
-                movimiento.getStockNuevo(),
-                movimiento.getMotivo(),
-                movimiento.getUsuarioResponsable().getNombreCompleto(),
+                movimiento.getStockActual(),
+                movimiento.getTipoMovimiento(), // Motivo = tipo de movimiento
+                movimiento.getUsuarioResponsable() != null ? movimiento.getUsuarioResponsable().getNombreCompleto() : "Sistema",
                 movimiento.getFechaMovimiento(),
-                movimiento.getReferencia(),
-                movimiento.getObservaciones()
+                movimiento.getReferenciaTabla(),
+                null // observaciones no existe en BD
         );
     }
 
-    private String traducirTipoMovimiento(MovimientoKardex.TipoMovimiento tipo) {
+    private String traducirTipoMovimiento(String tipo) {
         return switch (tipo) {
-            case ENTRADA_COMPRA -> "Entrada por Compra";
-            case SALIDA_VENTA -> "Salida por Venta";
-            case AJUSTE_POSITIVO -> "Ajuste Positivo";
-            case AJUSTE_NEGATIVO -> "Ajuste Negativo";
-            case TRASLADO_ENTRADA -> "Traslado (Entrada)";
-            case TRASLADO_SALIDA -> "Traslado (Salida)";
-            case DEVOLUCION -> "Devolución";
-            case MERMA -> "Merma";
+            case "ENTRADA_COMPRA" -> "Entrada por Compra";
+            case "SALIDA_VENTA" -> "Salida por Venta";
+            case "AJUSTE_POSITIVO" -> "Ajuste Positivo";
+            case "AJUSTE_NEGATIVO" -> "Ajuste Negativo";
+            case "TRASLADO_ENTRADA" -> "Traslado (Entrada)";
+            case "TRASLADO_SALIDA" -> "Traslado (Salida)";
+            case "DEVOLUCION" -> "Devolución";
+            case "MERMA" -> "Merma";
+            default -> tipo;
         };
     }
 }
