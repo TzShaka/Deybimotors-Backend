@@ -10,6 +10,10 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * ProductoRepository - ✅ ACTUALIZADO
+ * ❌ SIN queries de stockMinimo
+ */
 @Repository
 public interface ProductoRepository extends JpaRepository<Producto, Long>,
         JpaSpecificationExecutor<Producto> {
@@ -40,8 +44,8 @@ public interface ProductoRepository extends JpaRepository<Producto, Long>,
     @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock = 0 AND p.estado = true")
     List<Producto> findProductosSinStockPorSede(@Param("sedeId") Long sedeId);
 
-    // Productos con stock bajo
-    @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= p.stockMinimo AND p.estado = true")
+    // ✅ ACTUALIZADO: Stock bajo = stock <= 2 (sin usar stockMinimo)
+    @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= 2 AND p.estado = true")
     List<Producto> findProductosStockBajoPorSede(@Param("sedeId") Long sedeId);
 
     // Contar productos activos
@@ -64,9 +68,9 @@ public interface ProductoRepository extends JpaRepository<Producto, Long>,
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock = 0 AND p.estado = true")
     long countProductosSinStock(@Param("sedeId") Long sedeId);
 
-    // Contar con stock mínimo
-    @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= p.stockMinimo AND p.estado = true")
-    long countProductosStockMinimo(@Param("sedeId") Long sedeId);
+    // ✅ ACTUALIZADO: Contar con stock bajo (stock <= 2)
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= 2 AND p.estado = true")
+    long countProductosStockBajo(@Param("sedeId") Long sedeId);
 
     // Métodos de compatibilidad con código existente
     default Optional<Producto> findByCodigo(String codigo) {

@@ -17,8 +17,8 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Controlador de Productos - RF-004 a RF-017
- * ✅ ACTUALIZADO: Usa SecurityUtils
+ * Controlador de Productos - ✅ CORREGIDO
+ * RF-004 a RF-017
  */
 @RestController
 @RequestMapping("/api/productos")
@@ -92,7 +92,6 @@ public class ProductoController {
     /**
      * POST /api/productos
      * Crear nuevo producto
-     * ✅ ACTUALIZADO: Obtiene usuario autenticado del token
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
@@ -143,42 +142,27 @@ public class ProductoController {
     }
 
     /**
-     * POST /api/productos/{id}/fotos
-     * Subir foto de producto
+     * POST /api/productos/{id}/foto
+     * ✅ CORREGIDO: Subir/actualizar foto de producto
      */
-    @PostMapping("/{id}/fotos")
+    @PostMapping("/{id}/foto")
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
     public ResponseEntity<String> subirFoto(
             @PathVariable Long id,
-            @RequestParam("archivo") MultipartFile archivo,
-            @RequestParam(defaultValue = "false") boolean esPrincipal
+            @RequestParam("archivo") MultipartFile archivo
     ) throws IOException {
-        productoService.subirFoto(id, archivo, esPrincipal);
-        return ResponseEntity.ok("Foto subida correctamente");
+        productoService.subirFoto(id, archivo);
+        return ResponseEntity.ok("Foto actualizada correctamente");
     }
 
     /**
-     * DELETE /api/productos/fotos/{fotoId}
-     * Eliminar foto de producto
+     * DELETE /api/productos/{id}/foto
+     * ✅ NUEVO: Eliminar foto de producto
      */
-    @DeleteMapping("/fotos/{fotoId}")
+    @DeleteMapping("/{id}/foto")
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
-    public ResponseEntity<String> eliminarFoto(@PathVariable Long fotoId) {
-        productoService.eliminarFoto(fotoId);
+    public ResponseEntity<String> eliminarFoto(@PathVariable Long id) {
+        productoService.eliminarFoto(id);
         return ResponseEntity.ok("Foto eliminada correctamente");
-    }
-
-    /**
-     * PATCH /api/productos/{productoId}/fotos/{fotoId}/principal
-     * Establecer foto principal
-     */
-    @PatchMapping("/{productoId}/fotos/{fotoId}/principal")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
-    public ResponseEntity<String> establecerFotoPrincipal(
-            @PathVariable Long productoId,
-            @PathVariable Long fotoId
-    ) {
-        productoService.establecerFotoPrincipal(productoId, fotoId);
-        return ResponseEntity.ok("Foto principal actualizada");
     }
 }

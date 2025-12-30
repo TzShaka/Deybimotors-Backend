@@ -12,8 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Producto - ✅ CONFIRMADO CORRECTO
- * Ya coincide con la estructura de BD
+ * Entidad Producto - ✅ CORREGIDO
+ * - UN SOLO campo fotoUrl
+ * - SIN stock_minimo
+ * - CON publicoCatalogo
  */
 @Entity
 @Table(name = "productos")
@@ -80,8 +82,9 @@ public class Producto {
     @Column(nullable = false)
     private Integer stock = 0;
 
-    @Column(nullable = false, name = "stock_minimo")
-    private Integer stockMinimo = 0;
+    // ✅ FOTO - UN SOLO CAMPO
+    @Column(length = 500, name = "foto_url")
+    private String fotoUrl;
 
     // CÓDIGO DE PRECIO
     @ManyToOne(fetch = FetchType.EAGER)
@@ -95,6 +98,10 @@ public class Producto {
     @Column(precision = 10, scale = 2, name = "precio_venta")
     private BigDecimal precioVenta;
 
+    // ✅ NUEVO: Campo para catálogo público
+    @Column(nullable = false, name = "publico_catalogo")
+    private Boolean publicoCatalogo = false;
+
     // ESTADO
     @Column(nullable = false)
     private Boolean estado = true;
@@ -105,9 +112,6 @@ public class Producto {
     private LocalDateTime fechaCreacion;
 
     // RELACIONES
-    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ImagenProducto> imagenes = new ArrayList<>();
-
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Compatibilidad> compatibilidades = new ArrayList<>();
 
@@ -145,9 +149,5 @@ public class Producto {
 
     public void setActivo(Boolean activo) {
         this.estado = activo;
-    }
-
-    public List<ImagenProducto> getFotos() {
-        return this.imagenes;
     }
 }

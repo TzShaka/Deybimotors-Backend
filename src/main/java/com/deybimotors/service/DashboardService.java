@@ -15,7 +15,8 @@ import java.util.List;
 
 /**
  * Servicio de Dashboard - ✅ ACTUALIZADO
- * Trabaja con stock en tabla productos
+ * ❌ SIN métrica de productosStockMinimo
+ * ✅ CON métrica de productosStockBajo (stock <= 2)
  */
 @Service
 @RequiredArgsConstructor
@@ -28,9 +29,6 @@ public class DashboardService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    /**
-     * Obtener datos del dashboard - RF-003
-     */
     @Transactional(readOnly = true)
     public DashboardDTO.DashboardResponse obtenerDatosDashboard(Long sedeId) {
 
@@ -40,8 +38,8 @@ public class DashboardService {
         // Productos sin stock en la sede
         long productosSinStock = productoRepository.countProductosSinStock(sedeId);
 
-        // Productos con stock mínimo en la sede
-        long productosStockMinimo = productoRepository.countProductosStockMinimo(sedeId);
+        // ✅ ACTUALIZADO: Productos con stock bajo (stock <= 2)
+        long productosStockBajo = productoRepository.countProductosStockBajo(sedeId);
 
         // Total de categorías
         long totalCategorias = categoriaRepository.count();
@@ -55,7 +53,7 @@ public class DashboardService {
         return new DashboardDTO.DashboardResponse(
                 totalProductos,
                 productosSinStock,
-                productosStockMinimo,
+                productosStockBajo,
                 totalCategorias,
                 ultimasActualizaciones,
                 movimientosRecientes
@@ -93,7 +91,6 @@ public class DashboardService {
             ));
         }
 
-        // Ordenar por fecha descendente y limitar a 10
         actualizaciones.sort((a1, a2) -> a2.getFecha().compareTo(a1.getFecha()));
         return actualizaciones.stream().limit(10).toList();
     }

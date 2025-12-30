@@ -31,8 +31,8 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Servicio de Etiquetas - RF-020, RF-024, RF-031
- * ✅ CORREGIDO COMPLETO: Sin referencias a campos inexistentes
+ * Servicio de Etiquetas - ✅ ACTUALIZADO
+ * Sin cambios significativos (no usa stockMinimo ni imágenes)
  */
 @Service
 @RequiredArgsConstructor
@@ -41,9 +41,6 @@ public class EtiquetaService {
 
     private final ProductoRepository productoRepository;
 
-    /**
-     * Generar etiquetas para productos - RF-020, RF-024
-     */
     @Transactional(readOnly = true)
     public byte[] generarEtiquetas(List<Long> productosIds, int cantidadPorProducto) throws IOException, WriterException {
 
@@ -91,16 +88,12 @@ public class EtiquetaService {
         return baos.toByteArray();
     }
 
-    /**
-     * Crear una etiqueta individual
-     */
     private Table crearEtiqueta(Producto producto, byte[] codigoBarras) throws IOException {
 
         Table etiqueta = new Table(1);
         etiqueta.setWidth(UnitValue.createPercentValue(100));
         etiqueta.setPadding(5);
 
-        // Nombre del producto
         String nombreCorto = producto.getNombre().length() > 40
                 ? producto.getNombre().substring(0, 37) + "..."
                 : producto.getNombre();
@@ -110,12 +103,10 @@ public class EtiquetaService {
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBold();
 
-        // Código
         Paragraph codigo = new Paragraph("Código: " + producto.getCodigo())
                 .setFontSize(7)
                 .setTextAlignment(TextAlignment.CENTER);
 
-        // ✅ CORREGIDO: Marca/Modelo desde compatibilidades
         String marcaModelo = "";
         if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
             Compatibilidad compat = producto.getCompatibilidades().get(0);
@@ -131,18 +122,15 @@ public class EtiquetaService {
                 .setFontSize(6)
                 .setTextAlignment(TextAlignment.CENTER);
 
-        // Precio
         Paragraph precio = new Paragraph("S/ " + producto.getPrecioVenta())
                 .setFontSize(10)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBold();
 
-        // Código de barras
         Image imagenBarras = new Image(ImageDataFactory.create(codigoBarras));
         imagenBarras.setWidth(UnitValue.createPercentValue(90));
         imagenBarras.setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER);
 
-        // Agregar todo a la etiqueta
         etiqueta.addCell(nombre);
         etiqueta.addCell(codigo);
         if (!marcaModelo.isEmpty()) {
@@ -154,9 +142,6 @@ public class EtiquetaService {
         return etiqueta;
     }
 
-    /**
-     * Generar código de barras
-     */
     private byte[] generarCodigoBarras(String codigo) throws WriterException, IOException {
 
         Code128Writer barcodeWriter = new Code128Writer();
@@ -169,9 +154,6 @@ public class EtiquetaService {
         return baos.toByteArray();
     }
 
-    /**
-     * Generar etiquetas después de una compra - RF-031
-     */
     @Transactional(readOnly = true)
     public byte[] generarEtiquetasCompra(Long compraId) throws IOException, WriterException {
 

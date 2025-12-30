@@ -8,6 +8,7 @@ import java.util.List;
 
 /**
  * DTO para Dashboard - RF-003
+ * ✅ CORREGIDO: Campo productosStockBajo en lugar de productosStockMinimo
  */
 public class DashboardDTO {
 
@@ -17,10 +18,10 @@ public class DashboardDTO {
     public static class DashboardResponse {
         private Long totalProductos;
         private Long productosSinStock;
-        private Long productosStockMinimo;
+        private Long productosStockBajo; // ✅ Stock bajo = stock <= 2
         private Long totalCategorias;
         private List<UltimaActualizacion> ultimasActualizaciones;
-        private List<Movimiento> movimientosRecientes; // ✅ CORREGIDO
+        private List<Movimiento> movimientosRecientes;
     }
 
     @Data

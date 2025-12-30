@@ -28,8 +28,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Servicio de Exportaciones - RF-016, RF-017, RF-038
- * ACTUALIZADO: Trabaja con stock en tabla productos
+ * Servicio de Exportaciones - ✅ CORREGIDO
+ * RF-016, RF-017, RF-038
  */
 @Service
 @RequiredArgsConstructor
@@ -69,7 +69,7 @@ public class ExportService {
         CellStyle precioStyle = workbook.createCellStyle();
         precioStyle.setDataFormat(workbook.createDataFormat().getFormat("S/ #,##0.00"));
 
-        // ✅ COLUMNAS COMPLETAS
+        // COLUMNAS
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
                 "Código",
@@ -90,7 +90,6 @@ public class ExportService {
                 "Tipo",
                 "Medida 2",
                 "Stock",
-                "Stock Mín",
                 "Precio Costo",
                 "Precio Venta",
                 "Código Precio",
@@ -103,7 +102,7 @@ public class ExportService {
             cell.setCellStyle(headerStyle);
         }
 
-        // ✅ DATOS COMPLETOS
+        // DATOS
         int rowNum = 1;
         for (Producto producto : productos) {
             Row row = sheet.createRow(rowNum++);
@@ -193,9 +192,6 @@ public class ExportService {
             // Stock
             row.createCell(colNum++).setCellValue(producto.getStock());
 
-            // Stock Mínimo
-            row.createCell(colNum++).setCellValue(producto.getStockMinimo());
-
             // Precio Costo
             Cell precioCostoCell = row.createCell(colNum++);
             precioCostoCell.setCellValue(
@@ -220,7 +216,6 @@ public class ExportService {
         // Ajustar columnas
         for (int i = 0; i < columnas.length; i++) {
             sheet.autoSizeColumn(i);
-            // Asegurar ancho mínimo para columnas largas
             if (i == 4) { // Descripción
                 sheet.setColumnWidth(i, 8000);
             }
@@ -230,12 +225,13 @@ public class ExportService {
         workbook.write(baos);
         workbook.close();
 
-        log.info("Productos exportados a Excel: {} registros con {} columnas", productos.size(), columnas.length);
+        log.info("Productos exportados a Excel: {} registros", productos.size());
         return baos.toByteArray();
     }
 
     /**
      * Exportar productos con stock bajo a Excel - RF-017
+     * ✅ CORREGIDO: Línea 187 - Variable 'diferencia' definida correctamente
      */
     @Transactional(readOnly = true)
     public byte[] exportarProductosStockBajoExcel(Long sedeId) throws IOException {
@@ -256,7 +252,7 @@ public class ExportService {
         // Cabecera
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
-                "Código", "Descripción", "Categoría", "Stock Actual", "Stock Mínimo", "Diferencia"
+                "Código", "Descripción", "Categoría", "Stock Actual", "Estado"
         };
 
         for (int i = 0; i < columnas.length; i++) {
@@ -269,14 +265,16 @@ public class ExportService {
         int rowNum = 1;
         for (Producto producto : productos) {
             Row row = sheet.createRow(rowNum++);
-            int diferencia = producto.getStockMinimo() - producto.getStock();
 
             row.createCell(0).setCellValue(producto.getCodigoInterno());
             row.createCell(1).setCellValue(producto.getDescripcion());
             row.createCell(2).setCellValue(producto.getCategoria().getNombre());
             row.createCell(3).setCellValue(producto.getStock());
-            row.createCell(4).setCellValue(producto.getStockMinimo());
-            row.createCell(5).setCellValue(diferencia);
+
+            // ✅ CORREGIDO: Estado en lugar de diferencia
+            String estado = producto.getStock() == 0 ? "AGOTADO" :
+                    producto.getStock() <= 2 ? "STOCK BAJO" : "NORMAL";
+            row.createCell(4).setCellValue(estado);
         }
 
         for (int i = 0; i < columnas.length; i++) {
@@ -315,14 +313,12 @@ public class ExportService {
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc, PageSize.A4.rotate());
 
-        // Título
         Paragraph titulo = new Paragraph("REPORTE DE KARDEX")
                 .setFontSize(16)
                 .setBold()
                 .setTextAlignment(TextAlignment.CENTER);
         document.add(titulo);
 
-        // Subtítulo con fechas
         if (fechaInicio != null && fechaFin != null) {
             Paragraph subtitulo = new Paragraph(
                     "Periodo: " + fechaInicio.format(DATE_FORMATTER)
@@ -333,7 +329,6 @@ public class ExportService {
 
         document.add(new Paragraph("\n"));
 
-        // Tabla
         float[] columnWidths = {8, 15, 12, 12, 8, 8, 8, 15};
         Table table = new Table(UnitValue.createPercentArray(columnWidths));
         table.setWidth(UnitValue.createPercentValue(100));

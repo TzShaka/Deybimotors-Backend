@@ -20,8 +20,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Productos - RF-004 a RF-017
- * COMPLETAMENTE REESCRITO para la estructura real de BD
+ * Servicio de Productos - ✅ CORREGIDO
+ * - UN SOLO campo fotoUrl
+ * - SIN stock_minimo
  */
 @Service
 @RequiredArgsConstructor
@@ -34,13 +35,9 @@ public class ProductoService {
     private final SedeRepository sedeRepository;
     private final OrigenRepository origenRepository;
     private final CodigoPrecioRepository codigoPrecioRepository;
-    private final ImagenProductoRepository imagenProductoRepository;
     private final MovimientoKardexRepository kardexRepository;
     private final FileStorageService fileStorageService;
 
-    /**
-     * Listar todos los productos - RF-004
-     */
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoResponse> listarTodos() {
         return productoRepository.findByEstadoTrue().stream()
@@ -48,18 +45,12 @@ public class ProductoService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar productos con paginación
-     */
     @Transactional(readOnly = true)
     public Page<ProductoDTO.ProductoResponse> listarConPaginacion(Pageable pageable) {
         return productoRepository.findAll(pageable)
                 .map(this::convertirADTO);
     }
 
-    /**
-     * Listar productos con stock por sede - RF-004
-     */
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoConStockResponse> listarConStockPorSede(Long sedeId) {
         List<Producto> productos = productoRepository.findBySedeId(sedeId);
@@ -68,15 +59,12 @@ public class ProductoService {
                 .map(producto -> {
                     ProductoDTO.ProductoConStockResponse dto = new ProductoDTO.ProductoConStockResponse();
                     copiarDatosBasicos(producto, dto);
-                    dto.setStockSede(producto.getStock()); // Stock de la sede
+                    dto.setStockSede(producto.getStock());
                     return dto;
                 })
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Buscar productos con filtros avanzados - RF-012 a RF-014
-     */
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoResponse> buscarConFiltros(
             String nombre,
@@ -119,9 +107,6 @@ public class ProductoService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Obtener producto por ID - RF-006
-     */
     @Transactional(readOnly = true)
     public ProductoDTO.ProductoResponse obtenerPorId(Long id) {
         Producto producto = productoRepository.findById(id)
@@ -129,9 +114,6 @@ public class ProductoService {
         return convertirADTO(producto);
     }
 
-    /**
-     * Obtener producto por código
-     */
     @Transactional(readOnly = true)
     public ProductoDTO.ProductoResponse obtenerPorCodigo(String codigo) {
         Producto producto = productoRepository.findByCodigoInterno(codigo)
@@ -139,18 +121,13 @@ public class ProductoService {
         return convertirADTO(producto);
     }
 
-    /**
-     * Crear producto - RF-029
-     */
     @Transactional
     public ProductoDTO.ProductoResponse crear(ProductoDTO.ProductoRequest request, Long usuarioId) {
 
-        // Validar que no exista el código
         if (productoRepository.existsByCodigoInterno(request.getCodigo())) {
             throw new ConflictException("Ya existe un producto con el código: " + request.getCodigo());
         }
 
-        // Validar entidades relacionadas
         Sede sede = sedeRepository.findById(request.getSedeId() != null ? request.getSedeId() : 1L)
                 .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
 
@@ -166,7 +143,6 @@ public class ProductoService {
                     .orElseThrow(() -> new ResourceNotFoundException("Subcategoría no encontrada"));
         }
 
-        // Buscar o crear origen
         Origen origen = null;
         if (request.getOrigen() != null && !request.getOrigen().isEmpty()) {
             origen = origenRepository.findByPais(request.getOrigen())
@@ -177,7 +153,6 @@ public class ProductoService {
                     });
         }
 
-        // Buscar o crear código de precio
         CodigoPrecio codigoPrecio = null;
         if (request.getCodigoPrecio() != null && !request.getCodigoPrecio().isEmpty()) {
             codigoPrecio = codigoPrecioRepository.findByCodigo(request.getCodigoPrecio())
@@ -188,7 +163,6 @@ public class ProductoService {
                     });
         }
 
-        // Crear producto
         Producto producto = new Producto();
         producto.setSede(sede);
         producto.setCodigoInterno(request.getCodigo());
@@ -203,27 +177,23 @@ public class ProductoService {
         producto.setDiametro(request.getDiametro());
         producto.setTipo(request.getTipo());
         producto.setMedida2(request.getMedida2());
-        producto.setStock(0); // Stock inicial
-        producto.setStockMinimo(request.getStockMinimo());
+        producto.setStock(0);
         producto.setCodigoPrecio(codigoPrecio);
         producto.setPrecioCosto(request.getPrecioCosto());
         producto.setPrecioVenta(request.getPrecioVenta());
+        producto.setPublicoCatalogo(request.getPublicoCatalogo() != null ? request.getPublicoCatalogo() : false);
         producto.setEstado(true);
 
         Producto guardado = productoRepository.save(producto);
         return convertirADTO(guardado);
     }
 
-    /**
-     * Actualizar producto - RF-009
-     */
     @Transactional
     public ProductoDTO.ProductoResponse actualizar(Long id, ProductoDTO.ProductoRequest request) {
 
         Producto producto = productoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        // Validar código si cambió
         if (!producto.getCodigoInterno().equals(request.getCodigo())) {
             if (productoRepository.existsByCodigoInterno(request.getCodigo())) {
                 throw new ConflictException("Ya existe un producto con el código: " + request.getCodigo());
@@ -231,7 +201,6 @@ public class ProductoService {
             producto.setCodigoInterno(request.getCodigo());
         }
 
-        // Actualizar entidades relacionadas
         if (!producto.getCategoria().getId().equals(request.getCategoriaId())) {
             Categoria categoria = categoriaRepository.findById(request.getCategoriaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
@@ -252,7 +221,6 @@ public class ProductoService {
             producto.setSubcategoria(null);
         }
 
-        // Actualizar campos
         producto.setCodigoMarca(request.getCodigoMarca());
         producto.setCodigoReferencia(request.getCodigoReferencia());
         producto.setDescripcion(request.getNombre());
@@ -262,15 +230,12 @@ public class ProductoService {
         producto.setMedida2(request.getMedida2());
         producto.setPrecioCosto(request.getPrecioCosto());
         producto.setPrecioVenta(request.getPrecioVenta());
-        producto.setStockMinimo(request.getStockMinimo());
+        producto.setPublicoCatalogo(request.getPublicoCatalogo() != null ? request.getPublicoCatalogo() : false);
 
         Producto actualizado = productoRepository.save(producto);
         return convertirADTO(actualizado);
     }
 
-    /**
-     * Edición inline de campo específico - RF-009
-     */
     @Transactional
     public ProductoDTO.ProductoResponse actualizarCampo(Long id, String campo, Object valor) {
 
@@ -287,9 +252,6 @@ public class ProductoService {
             case "preciocosto":
                 producto.setPrecioCosto(new BigDecimal(valor.toString()));
                 break;
-            case "stockminimo":
-                producto.setStockMinimo(Integer.parseInt(valor.toString()));
-                break;
             case "medida":
                 producto.setMedida((String) valor);
                 break;
@@ -304,16 +266,12 @@ public class ProductoService {
         return convertirADTO(actualizado);
     }
 
-    /**
-     * Eliminar producto - RF-008
-     */
     @Transactional
     public void eliminar(Long id) {
 
         Producto producto = productoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        // Verificar si tiene movimientos en Kardex - RF-008
         List<MovimientoKardex> movimientos = kardexRepository.findByProductoIdOrderByFechaMovimientoDesc(id);
         if (!movimientos.isEmpty()) {
             throw new BadRequestException(
@@ -321,93 +279,60 @@ public class ProductoService {
             );
         }
 
-        // Verificar si tiene stock
         if (producto.getStock() > 0) {
             throw new BadRequestException(
                     "No se puede eliminar el producto porque tiene stock disponible."
             );
         }
 
-        // Eliminación lógica (recomendada)
         producto.setEstado(false);
         productoRepository.save(producto);
     }
 
     /**
-     * Subir foto de producto - RF-010
+     * ✅ CORREGIDO: Subir/Actualizar foto del producto
      */
     @Transactional
-    public void subirFoto(Long productoId, MultipartFile archivo, boolean esPrincipal) throws IOException {
+    public void subirFoto(Long productoId, MultipartFile archivo) throws IOException {
 
         Producto producto = productoRepository.findById(productoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        // Guardar archivo
-        String rutaArchivo = fileStorageService.guardarImagen(archivo, "productos");
-
-        // Si es principal, desmarcar las demás fotos
-        if (esPrincipal) {
-            List<ImagenProducto> fotosActuales = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(productoId);
-            fotosActuales.forEach(foto -> foto.setEsPrincipal(false));
-            imagenProductoRepository.saveAll(fotosActuales);
+        // Eliminar foto anterior si existe
+        if (producto.getFotoUrl() != null) {
+            fileStorageService.eliminarArchivo(producto.getFotoUrl());
         }
 
-        // Crear registro de imagen
-        ImagenProducto imagen = new ImagenProducto();
-        imagen.setProducto(producto);
-        imagen.setUrl(rutaArchivo);
-        imagen.setEsPrincipal(esPrincipal);
-        imagen.setOrden(producto.getImagenes().size() + 1);
-
-        imagenProductoRepository.save(imagen);
+        // Guardar nueva foto
+        String rutaArchivo = fileStorageService.guardarImagen(archivo, "productos");
+        producto.setFotoUrl(rutaArchivo);
+        productoRepository.save(producto);
     }
 
     /**
-     * Eliminar foto de producto - RF-010
+     * ✅ NUEVO: Eliminar foto del producto
      */
     @Transactional
-    public void eliminarFoto(Long fotoId) {
+    public void eliminarFoto(Long productoId) {
+        Producto producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        ImagenProducto foto = imagenProductoRepository.findById(fotoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Foto no encontrada"));
-
-        // Eliminar archivo físico
-        fileStorageService.eliminarArchivo(foto.getUrl());
-
-        // Eliminar registro
-        imagenProductoRepository.delete(foto);
+        if (producto.getFotoUrl() != null) {
+            fileStorageService.eliminarArchivo(producto.getFotoUrl());
+            producto.setFotoUrl(null);
+            productoRepository.save(producto);
+        }
     }
 
-    /**
-     * Establecer foto principal - RF-010
-     */
-    @Transactional
-    public void establecerFotoPrincipal(Long productoId, Long fotoId) {
-
-        // Desmarcar todas las fotos del producto
-        List<ImagenProducto> fotos = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(productoId);
-        fotos.forEach(foto -> foto.setEsPrincipal(false));
-        imagenProductoRepository.saveAll(fotos);
-
-        // Marcar la foto seleccionada como principal
-        ImagenProducto fotoPrincipal = imagenProductoRepository.findById(fotoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Foto no encontrada"));
-
-        fotoPrincipal.setEsPrincipal(true);
-        imagenProductoRepository.save(fotoPrincipal);
-    }
-
-    /**
-     * Listar productos para catálogo público - RF-058 a RF-062
-     */
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoCatalogoPublicoResponse> listarCatalogoPublico(
             Long categoriaId,
             Long marcaId
     ) {
-        List<Producto> productos = productoRepository.findByEstadoTrue();
+        List<Producto> productos = productoRepository.findByEstadoTrue().stream()
+                .filter(p -> p.getPublicoCatalogo() != null && p.getPublicoCatalogo())
+                .collect(Collectors.toList());
 
-        // Aplicar filtros
         if (categoriaId != null) {
             productos = productos.stream()
                     .filter(p -> p.getCategoria().getId().equals(categoriaId))
@@ -442,7 +367,6 @@ public class ProductoService {
         dto.setCodigoMarca(producto.getCodigoMarca());
         dto.setCodigoReferencia(producto.getCodigoReferencia());
 
-        // ✅ AGREGAR: Código OEM desde la relación
         if (!producto.getCodigosOem().isEmpty()) {
             dto.setCodigoOem(producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem());
         } else {
@@ -451,7 +375,6 @@ public class ProductoService {
 
         dto.setDescripcion(producto.getDescripcion());
 
-        // Categorización
         dto.setCategoriaId(producto.getCategoria().getId());
         dto.setCategoriaNombre(producto.getCategoria().getNombre());
 
@@ -463,7 +386,6 @@ public class ProductoService {
         dto.setMarcaId(producto.getMarcaProducto().getId());
         dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
 
-        // ✅ AGREGAR: Datos del vehículo desde compatibilidades
         if (!producto.getCompatibilidades().isEmpty()) {
             Compatibilidad compat = producto.getCompatibilidades().get(0);
             dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
@@ -479,31 +401,22 @@ public class ProductoService {
             dto.setMotor(null);
         }
 
-        // Especificaciones técnicas
         dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
         dto.setMedida(producto.getMedida());
         dto.setDiametro(producto.getDiametro());
         dto.setTipo(producto.getTipo());
         dto.setMedida2(producto.getMedida2());
 
-        // Precios
         dto.setPrecioVenta(producto.getPrecioVenta());
         dto.setPrecioCosto(producto.getPrecioCosto());
         dto.setCodigoPrecio(producto.getCodigoPrecio() != null ? producto.getCodigoPrecio().getCodigo() : null);
 
-        // Control
-        dto.setStockMinimo(producto.getStockMinimo());
         dto.setActivo(producto.getEstado());
+        dto.setPublicoCatalogo(producto.getPublicoCatalogo());
         dto.setFechaCreacion(producto.getFechaCreacion());
 
-        // Fotos
-        List<ImagenProducto> fotos = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(producto.getId());
-        dto.setFotos(fotos.stream().map(ImagenProducto::getUrl).collect(Collectors.toList()));
-
-        fotos.stream()
-                .filter(ImagenProducto::getEsPrincipal)
-                .findFirst()
-                .ifPresent(foto -> dto.setFotoPrincipal(foto.getUrl()));
+        // ✅ FOTO SIMPLE
+        dto.setFotoUrl(producto.getFotoUrl());
     }
 
     private ProductoDTO.ProductoCatalogoPublicoResponse convertirACatalogoPublicoDTO(Producto producto) {
@@ -518,6 +431,15 @@ public class ProductoService {
         dto.setSubcategoriaNombre(producto.getSubcategoria() != null ? producto.getSubcategoria().getNombre() : null);
         dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
 
+        if (!producto.getCompatibilidades().isEmpty()) {
+            Compatibilidad compat = producto.getCompatibilidades().get(0);
+            dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
+            if (compat.getModeloAutomovil() != null) {
+                dto.setModeloAutomovil(compat.getModeloAutomovil().getNombre());
+            }
+            dto.setMotor(compat.getMotor());
+        }
+
         dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
         dto.setMedida(producto.getMedida());
         dto.setDiametro(producto.getDiametro());
@@ -525,24 +447,18 @@ public class ProductoService {
 
         dto.setPrecioVenta(producto.getPrecioVenta());
 
-        // Calcular disponibilidad - RF-060
+        // ✅ Disponibilidad usando valor fijo (2 unidades)
         int stock = producto.getStock();
         if (stock == 0) {
             dto.setDisponibilidad("AGOTADO");
-        } else if (stock <= producto.getStockMinimo()) {
+        } else if (stock <= 2) {
             dto.setDisponibilidad("ULTIMAS_UNIDADES");
         } else {
             dto.setDisponibilidad("DISPONIBLE");
-        }   
+        }
 
-        // Fotos
-        List<ImagenProducto> fotos = imagenProductoRepository.findByProductoIdOrderByOrdenAsc(producto.getId());
-        dto.setFotos(fotos.stream().map(ImagenProducto::getUrl).collect(Collectors.toList()));
-
-        fotos.stream()
-                .filter(ImagenProducto::getEsPrincipal)
-                .findFirst()
-                .ifPresent(foto -> dto.setFotoPrincipal(foto.getUrl()));
+        // ✅ FOTO SIMPLE
+        dto.setFotoUrl(producto.getFotoUrl());
 
         return dto;
     }

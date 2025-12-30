@@ -17,8 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Servicio de Importación - RF-028
- * ✅ CORREGIDO: Eliminadas referencias a campos inexistentes
+ * Servicio de Importación - ✅ ACTUALIZADO
+ * ❌ SIN stockMinimo en importación
+ * Formato Excel: CODIGO | NOMBRE | CATEGORIA | SUBCATEGORIA | MARCA | PRECIO_VENTA | SEDE
  */
 @Service
 @RequiredArgsConstructor
@@ -31,11 +32,6 @@ public class ImportService {
     private final MarcaRepository marcaRepository;
     private final SedeRepository sedeRepository;
 
-    /**
-     * Importar productos desde Excel - RF-028
-     * Formato esperado del Excel:
-     * CODIGO | NOMBRE | CATEGORIA | SUBCATEGORIA | MARCA | PRECIO_VENTA | STOCK_MINIMO | SEDE
-     */
     @Transactional
     public ImportResult importarProductosDesdeExcel(MultipartFile archivo) throws IOException {
 
@@ -44,26 +40,22 @@ public class ImportService {
         Workbook workbook = new XSSFWorkbook(archivo.getInputStream());
         Sheet sheet = workbook.getSheetAt(0);
 
-        // Saltar la primera fila (cabecera)
         int filaActual = 1;
 
         for (Row row : sheet) {
 
-            if (row.getRowNum() == 0) continue; // Saltar cabecera
+            if (row.getRowNum() == 0) continue;
 
             try {
 
-                // Leer datos de la fila
                 String codigo = getCellValueAsString(row.getCell(0));
                 String nombre = getCellValueAsString(row.getCell(1));
                 String categoriaNombre = getCellValueAsString(row.getCell(2));
                 String subcategoriaNombre = getCellValueAsString(row.getCell(3));
                 String marcaNombre = getCellValueAsString(row.getCell(4));
                 String precioVentaStr = getCellValueAsString(row.getCell(5));
-                String stockMinimoStr = getCellValueAsString(row.getCell(6));
-                String sedeNombre = getCellValueAsString(row.getCell(7));
+                String sedeNombre = getCellValueAsString(row.getCell(6));
 
-                // Validaciones básicas
                 if (codigo == null || codigo.isEmpty()) {
                     resultado.agregarError(filaActual, "Código es obligatorio");
                     filaActual++;
@@ -76,14 +68,12 @@ public class ImportService {
                     continue;
                 }
 
-                // Verificar si el producto ya existe
                 if (productoRepository.existsByCodigo(codigo)) {
                     resultado.agregarError(filaActual, "El código " + codigo + " ya existe");
                     filaActual++;
                     continue;
                 }
 
-                // Buscar o crear categoría
                 Categoria categoria = categoriaRepository.findByNombre(categoriaNombre)
                         .orElseGet(() -> {
                             Categoria nuevaCategoria = new Categoria();
@@ -92,7 +82,6 @@ public class ImportService {
                             return categoriaRepository.save(nuevaCategoria);
                         });
 
-                // Buscar o crear subcategoría
                 Subcategoria subcategoria = null;
                 if (subcategoriaNombre != null && !subcategoriaNombre.isEmpty()) {
                     subcategoria = subcategoriaRepository.findByNombreAndCategoriaId(subcategoriaNombre, categoria.getId())
@@ -105,7 +94,6 @@ public class ImportService {
                             });
                 }
 
-                // Buscar o crear marca
                 Marca marca = marcaRepository.findByNombre(marcaNombre)
                         .orElseGet(() -> {
                             Marca nuevaMarca = new Marca();
@@ -114,13 +102,11 @@ public class ImportService {
                             return marcaRepository.save(nuevaMarca);
                         });
 
-                // Buscar sede
                 Sede sede = sedeRepository.findByNombre(sedeNombre != null ? sedeNombre : "Sede Principal")
                         .orElseGet(() -> sedeRepository.findAll().stream()
                                 .findFirst()
                                 .orElseThrow(() -> new BadRequestException("No existe ninguna sede")));
 
-                // Crear producto
                 Producto producto = new Producto();
                 producto.setCodigoInterno(codigo);
                 producto.setDescripcion(nombre);
@@ -129,24 +115,13 @@ public class ImportService {
                 producto.setMarcaProducto(marca);
                 producto.setSede(sede);
 
-                // Precio de venta
                 try {
                     producto.setPrecioVenta(new BigDecimal(precioVentaStr != null ? precioVentaStr : "0"));
                 } catch (Exception e) {
                     producto.setPrecioVenta(BigDecimal.ZERO);
                 }
 
-                // Stock mínimo
-                try {
-                    producto.setStockMinimo(Integer.parseInt(stockMinimoStr != null ? stockMinimoStr : "0"));
-                } catch (Exception e) {
-                    producto.setStockMinimo(0);
-                }
-
-                // Stock inicial
                 producto.setStock(0);
-
-                // Estado
                 producto.setEstado(true);
 
                 productoRepository.save(producto);
@@ -168,9 +143,6 @@ public class ImportService {
         return resultado;
     }
 
-    /**
-     * Obtener valor de celda como String
-     */
     private String getCellValueAsString(Cell cell) {
         if (cell == null) return null;
 
@@ -183,9 +155,6 @@ public class ImportService {
         };
     }
 
-    /**
-     * Clase para resultado de importación
-     */
     public static class ImportResult {
         private int productosImportados = 0;
         private final List<String> errores = new ArrayList<>();

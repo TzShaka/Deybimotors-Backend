@@ -15,8 +15,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Stock - ✅ REESCRITO COMPLETO
- * Trabaja directamente con productos.stock (NO hay tabla stock separada)
+ * Servicio de Stock - ✅ ACTUALIZADO
+ * ❌ SIN validaciones de stockMinimo
+ * ✅ Stock bajo = stock <= 2 (valor fijo)
  */
 @Service
 @RequiredArgsConstructor
@@ -29,9 +30,6 @@ public class StockService {
     private final SalidaRepository salidaRepository;
     private final DetalleSalidaRepository detalleSalidaRepository;
 
-    /**
-     * Obtener stock de un producto (en su sede asignada)
-     */
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerStockProducto(Long productoId) {
 
@@ -46,7 +44,6 @@ public class StockService {
                 producto.getSede().getId(),
                 producto.getSede().getNombre(),
                 producto.getStock(),
-                producto.getStockMinimo(),
                 producto.getFechaCreacion(),
                 calcularEstadoStock(producto)
         );
@@ -54,9 +51,6 @@ public class StockService {
         return List.of(response);
     }
 
-    /**
-     * Obtener stock de una sede específica
-     */
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerStockSede(Long sedeId) {
 
@@ -70,9 +64,6 @@ public class StockService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Obtener productos sin stock en una sede
-     */
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerProductosSinStock(Long sedeId) {
 
@@ -84,7 +75,7 @@ public class StockService {
     }
 
     /**
-     * Obtener productos con stock bajo en una sede
+     * ✅ ACTUALIZADO: Stock bajo = stock <= 2
      */
     @Transactional(readOnly = true)
     public List<StockDTO.StockResponse> obtenerProductosStockBajo(Long sedeId) {
@@ -96,9 +87,6 @@ public class StockService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Ajustar stock manualmente - RF-011
-     */
     @Transactional
     public StockDTO.StockResponse ajustarStock(StockDTO.AjusteStockRequest request, Long usuarioId) {
 
@@ -108,7 +96,6 @@ public class StockService {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        // Validar que la sede del ajuste coincida con la sede del producto
         if (!producto.getSede().getId().equals(request.getSedeId())) {
             throw new BadRequestException("El producto pertenece a otra sede");
         }
@@ -120,11 +107,9 @@ public class StockService {
         int stockAnterior = producto.getStock();
         int diferencia = request.getCantidadNueva() - stockAnterior;
 
-        // Actualizar stock
         producto.setStock(request.getCantidadNueva());
         Producto actualizado = productoRepository.save(producto);
 
-        // Registrar movimiento en Kardex
         MovimientoKardex movimiento = new MovimientoKardex();
         movimiento.setProducto(producto);
         movimiento.setSede(producto.getSede());
@@ -140,9 +125,6 @@ public class StockService {
         return convertirADTO(actualizado);
     }
 
-    /**
-     * Registrar salida de productos (carrito) - RF-018, RF-019
-     */
     @Transactional
     public void registrarSalida(StockDTO.ConfirmarSalidaRequest request, Long usuarioId) {
 
@@ -154,7 +136,6 @@ public class StockService {
 
         List<String> errores = new ArrayList<>();
 
-        // Validar stock disponible para todos los productos
         for (StockDTO.SalidaStockRequest item : request.getProductos()) {
 
             Producto producto = productoRepository.findById(item.getProductoId())
@@ -177,7 +158,6 @@ public class StockService {
             throw new InsufficientStockException("Errores en la salida: " + String.join("; ", errores));
         }
 
-        // Crear cabecera de salida
         Salida salida = new Salida();
         salida.setSede(sede);
         salida.setMotivo(request.getMotivo());
@@ -185,25 +165,21 @@ public class StockService {
         salida.setUsuario(usuario);
         Salida salidaGuardada = salidaRepository.save(salida);
 
-        // Registrar salidas
         for (StockDTO.SalidaStockRequest item : request.getProductos()) {
 
             Producto producto = productoRepository.findById(item.getProductoId()).get();
             int stockAnterior = producto.getStock();
             int stockNuevo = stockAnterior - item.getCantidad();
 
-            // Actualizar stock
             producto.setStock(stockNuevo);
             productoRepository.save(producto);
 
-            // Crear detalle de salida
             DetalleSalida detalle = new DetalleSalida();
             detalle.setSalida(salidaGuardada);
             detalle.setProducto(producto);
             detalle.setCantidad(item.getCantidad());
             detalleSalidaRepository.save(detalle);
 
-            // Registrar en Kardex
             MovimientoKardex movimiento = new MovimientoKardex();
             movimiento.setProducto(producto);
             movimiento.setSede(sede);
@@ -219,9 +195,6 @@ public class StockService {
         }
     }
 
-    /**
-     * Incrementar stock (usado en compras) - RF-030
-     */
     @Transactional
     public void incrementarStock(Long productoId, Long sedeId, Integer cantidad, Long usuarioId, String referencia) {
 
@@ -238,11 +211,9 @@ public class StockService {
         int stockAnterior = producto.getStock();
         int stockNuevo = stockAnterior + cantidad;
 
-        // Actualizar stock
         producto.setStock(stockNuevo);
         productoRepository.save(producto);
 
-        // Registrar en Kardex
         MovimientoKardex movimiento = new MovimientoKardex();
         movimiento.setProducto(producto);
         movimiento.setSede(producto.getSede());
@@ -266,10 +237,13 @@ public class StockService {
         };
     }
 
+    /**
+     * ✅ ACTUALIZADO: Stock bajo = stock <= 2 (sin usar stockMinimo)
+     */
     private String calcularEstadoStock(Producto producto) {
         if (producto.getStock() == 0) {
             return "AGOTADO";
-        } else if (producto.getStock() <= producto.getStockMinimo()) {
+        } else if (producto.getStock() <= 2) {
             return "BAJO";
         } else {
             return "NORMAL";
@@ -285,7 +259,6 @@ public class StockService {
                 producto.getSede().getId(),
                 producto.getSede().getNombre(),
                 producto.getStock(),
-                producto.getStockMinimo(),
                 producto.getFechaCreacion(),
                 calcularEstadoStock(producto)
         );

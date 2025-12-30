@@ -8,10 +8,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List; // ✅ AGREGADO
+import java.util.List;
 
 /**
- * DTO para Stock - Gestión de inventario
+ * DTO para Stock - ✅ ACTUALIZADO
  */
 public class StockDTO {
 
@@ -26,7 +26,6 @@ public class StockDTO {
         private Long sedeId;
         private String sedeNombre;
         private Integer cantidad;
-        private Integer stockMinimo;
         private LocalDateTime fechaActualizacion;
         private String estado; // NORMAL, BAJO, AGOTADO
     }
@@ -75,6 +74,6 @@ public class StockDTO {
         private String observaciones;
 
         @NotNull(message = "Los productos son obligatorios")
-        private List<SalidaStockRequest> productos; // ✅ Ahora está correcto
+        private List<SalidaStockRequest> productos;
     }
 }

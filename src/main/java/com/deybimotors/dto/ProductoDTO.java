@@ -9,10 +9,12 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * DTO para Producto - ACTUALIZADO con sedeId
+ * DTO para Producto - ✅ CORREGIDO
+ * - UN SOLO campo fotoUrl (String)
+ * - SIN stock_minimo
+ * - CON publicoCatalogo
  */
 public class ProductoDTO {
 
@@ -24,7 +26,7 @@ public class ProductoDTO {
         private String codigo;
         private String codigoMarca;
         private String codigoReferencia;
-        private String codigoOem;           // ✅ Este campo
+        private String codigoOem;
         private String descripcion;
 
         // Categorización
@@ -35,11 +37,11 @@ public class ProductoDTO {
         private Long marcaId;
         private String marcaNombre;
 
-        // ✅ Datos del vehículo
-        private String marcaAutomovil;      // ✅ Este campo
-        private String modeloAutomovil;     // ✅ Este campo
-        private String anio;                // ✅ Este campo
-        private String motor;               // ✅ Este campo
+        // Datos del vehículo
+        private String marcaAutomovil;
+        private String modeloAutomovil;
+        private String anio;
+        private String motor;
 
         // Especificaciones técnicas
         private String origen;
@@ -54,14 +56,12 @@ public class ProductoDTO {
         private String codigoPrecio;
 
         // Control
-        private Integer stockMinimo;
         private Boolean activo;
         private Boolean publicoCatalogo;
         private LocalDateTime fechaCreacion;
 
-        // Fotos
-        private List<String> fotos;
-        private String fotoPrincipal;
+        // ✅ FOTO - UN SOLO CAMPO
+        private String fotoUrl;
 
         // Stock
         private Integer stockTotal;
@@ -96,7 +96,6 @@ public class ProductoDTO {
         @NotNull(message = "La marca es obligatoria")
         private Long marcaId;
 
-        // ✅ NUEVO: Sede obligatoria
         @NotNull(message = "La sede es obligatoria")
         private Long sedeId;
 
@@ -121,9 +120,10 @@ public class ProductoDTO {
         private BigDecimal precioCosto;
 
         private String codigoPrecio;
-        private Integer stockMinimo = 0;
         private Boolean publicoCatalogo = false;
         private String observaciones;
+
+        // ✅ SIN fotoUrl - Las fotos se suben por separado con MultipartFile
     }
 
     @Data
@@ -155,8 +155,7 @@ public class ProductoDTO {
         private BigDecimal precioVenta;
         private String disponibilidad; // DISPONIBLE, ULTIMAS_UNIDADES, AGOTADO
 
-        // Fotos
-        private List<String> fotos;
-        private String fotoPrincipal;
+        // ✅ FOTO - UN SOLO CAMPO
+        private String fotoUrl;
     }
 }
