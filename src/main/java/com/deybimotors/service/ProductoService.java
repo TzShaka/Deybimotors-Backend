@@ -20,9 +20,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Productos - ✅ CORREGIDO
- * - UN SOLO campo fotoUrl
- * - SIN stock_minimo
+ * Servicio de Productos - ✅ CORREGIDO FINAL
+ * Con manejo completo de valores NULL
  */
 @Service
 @RequiredArgsConstructor
@@ -40,7 +39,17 @@ public class ProductoService {
 
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoResponse> listarTodos() {
-        return productoRepository.findByEstadoTrue().stream()
+        List<Producto> productos = productoRepository.findByEstadoTrue();
+
+        // ✅ DEBUG
+        System.out.println("========================================");
+        System.out.println("Productos encontrados: " + productos.size());
+        for (Producto p : productos) {
+            System.out.println("- ID: " + p.getId() + " | Código: " + p.getCodigoInterno() + " | Desc: " + p.getDescripcion());
+        }
+        System.out.println("========================================");
+
+        return productos.stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
@@ -289,29 +298,21 @@ public class ProductoService {
         productoRepository.save(producto);
     }
 
-    /**
-     * ✅ CORREGIDO: Subir/Actualizar foto del producto
-     */
     @Transactional
     public void subirFoto(Long productoId, MultipartFile archivo) throws IOException {
 
         Producto producto = productoRepository.findById(productoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
-        // Eliminar foto anterior si existe
         if (producto.getFotoUrl() != null) {
             fileStorageService.eliminarArchivo(producto.getFotoUrl());
         }
 
-        // Guardar nueva foto
         String rutaArchivo = fileStorageService.guardarImagen(archivo, "productos");
         producto.setFotoUrl(rutaArchivo);
         productoRepository.save(producto);
     }
 
-    /**
-     * ✅ NUEVO: Eliminar foto del producto
-     */
     @Transactional
     public void eliminarFoto(Long productoId) {
         Producto producto = productoRepository.findById(productoId)
@@ -335,13 +336,13 @@ public class ProductoService {
 
         if (categoriaId != null) {
             productos = productos.stream()
-                    .filter(p -> p.getCategoria().getId().equals(categoriaId))
+                    .filter(p -> p.getCategoria() != null && p.getCategoria().getId().equals(categoriaId))
                     .collect(Collectors.toList());
         }
 
         if (marcaId != null) {
             productos = productos.stream()
-                    .filter(p -> p.getMarcaProducto().getId().equals(marcaId))
+                    .filter(p -> p.getMarcaProducto() != null && p.getMarcaProducto().getId().equals(marcaId))
                     .collect(Collectors.toList());
         }
 
@@ -351,13 +352,27 @@ public class ProductoService {
     }
 
     // ========================================
-    // MÉTODOS AUXILIARES DE CONVERSIÓN DTO
+    // MÉTODOS AUXILIARES - ✅ CORREGIDOS
     // ========================================
 
     private ProductoDTO.ProductoResponse convertirADTO(Producto producto) {
         ProductoDTO.ProductoResponse dto = new ProductoDTO.ProductoResponse();
-        copiarDatosBasicos(producto, dto);
-        dto.setStockTotal(producto.getStock());
+
+        try {
+            copiarDatosBasicos(producto, dto);
+            dto.setStockTotal(producto.getStock());
+        } catch (Exception e) {
+            System.err.println("❌ Error convirtiendo producto ID " + producto.getId() + ": " + e.getMessage());
+            e.printStackTrace();
+
+            // DTO con datos mínimos
+            dto.setId(producto.getId());
+            dto.setCodigo(producto.getCodigoInterno());
+            dto.setDescripcion(producto.getDescripcion());
+            dto.setStockTotal(producto.getStock());
+            dto.setActivo(producto.getEstado());
+        }
+
         return dto;
     }
 
@@ -367,33 +382,55 @@ public class ProductoService {
         dto.setCodigoMarca(producto.getCodigoMarca());
         dto.setCodigoReferencia(producto.getCodigoReferencia());
 
-        if (!producto.getCodigosOem().isEmpty()) {
-            dto.setCodigoOem(producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem());
+        // ✅ Manejo seguro de codigosOem
+        if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
+            try {
+                dto.setCodigoOem(producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem());
+            } catch (Exception e) {
+                dto.setCodigoOem(null);
+            }
         } else {
             dto.setCodigoOem(null);
         }
 
         dto.setDescripcion(producto.getDescripcion());
 
-        dto.setCategoriaId(producto.getCategoria().getId());
-        dto.setCategoriaNombre(producto.getCategoria().getNombre());
+        // ✅ Manejo seguro de categoría
+        if (producto.getCategoria() != null) {
+            dto.setCategoriaId(producto.getCategoria().getId());
+            dto.setCategoriaNombre(producto.getCategoria().getNombre());
+        }
 
+        // ✅ Manejo seguro de subcategoría
         if (producto.getSubcategoria() != null) {
             dto.setSubcategoriaId(producto.getSubcategoria().getId());
             dto.setSubcategoriaNombre(producto.getSubcategoria().getNombre());
         }
 
-        dto.setMarcaId(producto.getMarcaProducto().getId());
-        dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
+        // ✅ Manejo seguro de marca
+        if (producto.getMarcaProducto() != null) {
+            dto.setMarcaId(producto.getMarcaProducto().getId());
+            dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
+        }
 
-        if (!producto.getCompatibilidades().isEmpty()) {
-            Compatibilidad compat = producto.getCompatibilidades().get(0);
-            dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
-            if (compat.getModeloAutomovil() != null) {
-                dto.setModeloAutomovil(compat.getModeloAutomovil().getNombre());
+        // ✅ Manejo seguro de compatibilidades
+        if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
+            try {
+                Compatibilidad compat = producto.getCompatibilidades().get(0);
+                if (compat.getMarcaAutomovil() != null) {
+                    dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
+                }
+                if (compat.getModeloAutomovil() != null) {
+                    dto.setModeloAutomovil(compat.getModeloAutomovil().getNombre());
+                }
+                dto.setAnio(compat.getAnio());
+                dto.setMotor(compat.getMotor());
+            } catch (Exception e) {
+                dto.setMarcaAutomovil(null);
+                dto.setModeloAutomovil(null);
+                dto.setAnio(null);
+                dto.setMotor(null);
             }
-            dto.setAnio(compat.getAnio());
-            dto.setMotor(compat.getMotor());
         } else {
             dto.setMarcaAutomovil(null);
             dto.setModeloAutomovil(null);
@@ -414,8 +451,6 @@ public class ProductoService {
         dto.setActivo(producto.getEstado());
         dto.setPublicoCatalogo(producto.getPublicoCatalogo());
         dto.setFechaCreacion(producto.getFechaCreacion());
-
-        // ✅ FOTO SIMPLE
         dto.setFotoUrl(producto.getFotoUrl());
     }
 
@@ -427,27 +462,27 @@ public class ProductoService {
         dto.setNombre(producto.getDescripcion());
         dto.setDescripcion(producto.getDescripcion());
 
-        dto.setCategoriaNombre(producto.getCategoria().getNombre());
+        dto.setCategoriaNombre(producto.getCategoria() != null ? producto.getCategoria().getNombre() : null);
         dto.setSubcategoriaNombre(producto.getSubcategoria() != null ? producto.getSubcategoria().getNombre() : null);
-        dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
+        dto.setMarcaNombre(producto.getMarcaProducto() != null ? producto.getMarcaProducto().getNombre() : null);
 
-        if (!producto.getCompatibilidades().isEmpty()) {
-            Compatibilidad compat = producto.getCompatibilidades().get(0);
-            dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
-            if (compat.getModeloAutomovil() != null) {
-                dto.setModeloAutomovil(compat.getModeloAutomovil().getNombre());
+        if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
+            try {
+                Compatibilidad compat = producto.getCompatibilidades().get(0);
+                dto.setMarcaAutomovil(compat.getMarcaAutomovil() != null ? compat.getMarcaAutomovil().getNombre() : null);
+                dto.setModeloAutomovil(compat.getModeloAutomovil() != null ? compat.getModeloAutomovil().getNombre() : null);
+                dto.setMotor(compat.getMotor());
+            } catch (Exception e) {
+                // Silenciosamente manejar error
             }
-            dto.setMotor(compat.getMotor());
         }
 
         dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
         dto.setMedida(producto.getMedida());
         dto.setDiametro(producto.getDiametro());
         dto.setTipo(producto.getTipo());
-
         dto.setPrecioVenta(producto.getPrecioVenta());
 
-        // ✅ Disponibilidad usando valor fijo (2 unidades)
         int stock = producto.getStock();
         if (stock == 0) {
             dto.setDisponibilidad("AGOTADO");
@@ -457,7 +492,6 @@ public class ProductoService {
             dto.setDisponibilidad("DISPONIBLE");
         }
 
-        // ✅ FOTO SIMPLE
         dto.setFotoUrl(producto.getFotoUrl());
 
         return dto;

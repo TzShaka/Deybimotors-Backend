@@ -1,5 +1,6 @@
 package com.deybimotors.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,10 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Producto - ✅ CORREGIDO
- * - UN SOLO campo fotoUrl
- * - SIN stock_minimo
- * - CON publicoCatalogo
+ * Entidad Producto - ✅ CORREGIDO FINAL
+ * Sin métodos de compatibilidad que causan conflicto con Jackson
  */
 @Entity
 @Table(name = "productos")
@@ -28,12 +27,10 @@ public class Producto {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // RELACIÓN CON SEDE
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "sede_id", nullable = false)
     private Sede sede;
 
-    // CÓDIGOS DEL PRODUCTO
     @Column(length = 50, name = "codigo_marca")
     private String codigoMarca;
 
@@ -43,11 +40,9 @@ public class Producto {
     @Column(nullable = false, unique = true, length = 50, name = "codigo_interno")
     private String codigoInterno;
 
-    // DESCRIPCIÓN
     @Column(columnDefinition = "TEXT")
     private String descripcion;
 
-    // CATEGORIZACIÓN
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "categoria_id")
     private Categoria categoria;
@@ -60,12 +55,10 @@ public class Producto {
     @JoinColumn(name = "marca_producto_id")
     private Marca marcaProducto;
 
-    // ORIGEN
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "origen_id")
     private Origen origen;
 
-    // ESPECIFICACIONES TÉCNICAS
     @Column(length = 50)
     private String medida;
 
@@ -78,76 +71,83 @@ public class Producto {
     @Column(length = 50, name = "medida_2")
     private String medida2;
 
-    // STOCK (EN LA TABLA PRODUCTOS)
     @Column(nullable = false)
     private Integer stock = 0;
 
-    // ✅ FOTO - UN SOLO CAMPO
     @Column(length = 500, name = "foto_url")
     private String fotoUrl;
 
-    // CÓDIGO DE PRECIO
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "codigo_precio_id")
     private CodigoPrecio codigoPrecio;
 
-    // PRECIOS
     @Column(precision = 10, scale = 2, name = "precio_costo")
     private BigDecimal precioCosto;
 
     @Column(precision = 10, scale = 2, name = "precio_venta")
     private BigDecimal precioVenta;
 
-    // ✅ NUEVO: Campo para catálogo público
     @Column(nullable = false, name = "publico_catalogo")
+    @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
     private Boolean publicoCatalogo = false;
 
-    // ESTADO
     @Column(nullable = false)
+    @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
     private Boolean estado = true;
 
-    // AUDITORÍA
     @CreationTimestamp
     @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
-    // RELACIONES
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Compatibilidad> compatibilidades = new ArrayList<>();
 
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProductoOem> codigosOem = new ArrayList<>();
 
-    // MÉTODOS DE COMPATIBILIDAD CON CÓDIGO EXISTENTE
+    // ========================================
+    // MÉTODOS DE COMPATIBILIDAD CON @JsonIgnore
+    // Estos métodos NO se serializan a JSON
+    // Solo se usan internamente en el código Java
+    // ========================================
+
+    @JsonIgnore
     public String getCodigo() {
         return this.codigoInterno;
     }
 
+    @JsonIgnore
     public void setCodigo(String codigo) {
         this.codigoInterno = codigo;
     }
 
-    public Marca getMarca() {
-        return this.marcaProducto;
-    }
-
-    public void setMarca(Marca marca) {
-        this.marcaProducto = marca;
-    }
-
+    @JsonIgnore
     public String getNombre() {
         return this.descripcion;
     }
 
+    @JsonIgnore
     public void setNombre(String nombre) {
         this.descripcion = nombre;
     }
 
+    @JsonIgnore
     public Boolean getActivo() {
         return this.estado;
     }
 
+    @JsonIgnore
     public void setActivo(Boolean activo) {
         this.estado = activo;
+    }
+
+    @JsonIgnore
+    public Marca getMarca() {
+        return this.marcaProducto;
+    }
+
+    @JsonIgnore
+    public void setMarca(Marca marca) {
+        this.marcaProducto = marca;
     }
 }
