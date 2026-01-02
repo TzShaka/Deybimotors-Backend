@@ -6,6 +6,7 @@ import com.deybimotors.exception.BadRequestException;
 import com.deybimotors.exception.ResourceNotFoundException;
 import com.deybimotors.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,11 +19,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Compras - ✅ ACTUALIZADO
- * Corregido para trabajar con campos reales de BD
+ * Servicio de Compras
+ * ✅ ACTUALIZADO: Usa Cloudinary para almacenamiento global
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CompraService {
 
     private final CompraRepository compraRepository;
@@ -32,7 +34,9 @@ public class CompraService {
     private final ProductoRepository productoRepository;
     private final UsuarioRepository usuarioRepository;
     private final StockService stockService;
-    private final FileStorageService fileStorageService;
+
+    // ✅ CAMBIO: Ahora usa Cloudinary en lugar de FileStorageService local
+    private final CloudinaryFileStorageService cloudinaryService;
 
     @Transactional(readOnly = true)
     public List<CompraDTO.CompraResponse> listarTodas() {
@@ -138,27 +142,88 @@ public class CompraService {
 
         Compra guardada = compraRepository.save(compra);
 
+        log.info("✅ Compra creada: {} - Total: {}", guardada.getNumeroCompra(), guardada.getMontoTotal());
         return convertirADTO(guardada);
     }
 
     /**
-     * Subir factura de compra - RF-025
+     * Actualizar compra (proveedor y observaciones)
      */
     @Transactional
-    public void subirFactura(Long compraId, MultipartFile archivo) throws IOException {
+    public CompraDTO.CompraResponse actualizar(Long id, CompraDTO.ActualizarCompraRequest request) {
+
+        Compra compra = compraRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Compra no encontrada"));
+
+        if (compra.getEstado() != Compra.EstadoCompra.PENDIENTE) {
+            throw new BadRequestException("Solo se pueden actualizar compras en estado PENDIENTE");
+        }
+
+        if (!compra.getProveedor().getId().equals(request.getProveedorId())) {
+            Proveedor nuevoProveedor = proveedorRepository.findById(request.getProveedorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Proveedor no encontrado"));
+            compra.setProveedor(nuevoProveedor);
+        }
+
+        compra.setObservaciones(request.getObservaciones());
+        Compra actualizada = compraRepository.save(compra);
+
+        log.info("✅ Compra actualizada: {}", actualizada.getNumeroCompra());
+        return convertirADTO(actualizada);
+    }
+
+    /**
+     * ✅ ACTUALIZADO: Subir factura a Cloudinary
+     */
+    @Transactional
+    public CompraDTO.CompraResponse subirFactura(Long compraId, MultipartFile archivo) throws IOException {
 
         Compra compra = compraRepository.findById(compraId)
                 .orElseThrow(() -> new ResourceNotFoundException("Compra no encontrada"));
 
-        String rutaArchivo = fileStorageService.guardarDocumento(archivo, "facturas");
+        // Si ya tiene archivo, eliminar el anterior de Cloudinary
+        if (compra.getRutaFactura() != null) {
+            cloudinaryService.eliminarArchivo(compra.getRutaFactura());
+            log.info("🗑️ Archivo anterior eliminado de Cloudinary");
+        }
 
-        compra.setRutaFactura(rutaArchivo);
-        compraRepository.save(compra);
+        // ✅ Subir a Cloudinary y obtener URL pública global
+        String urlPublica = cloudinaryService.subirDocumento(archivo, "facturas");
+
+        // Guardar URL en BD
+        compra.setRutaFactura(urlPublica);
+        Compra actualizada = compraRepository.save(compra);
+
+        log.info("✅ Factura subida a Cloudinary: {} -> {}", compra.getNumeroCompra(), urlPublica);
+        return convertirADTO(actualizada);
     }
 
     /**
-     * Actualizar estado de compra - RF-030
-     * CRÍTICO: Solo actualiza stock cuando estado = COMPLETADO
+     * ✅ ACTUALIZADO: Eliminar factura de Cloudinary
+     */
+    @Transactional
+    public CompraDTO.CompraResponse eliminarFactura(Long compraId) {
+
+        Compra compra = compraRepository.findById(compraId)
+                .orElseThrow(() -> new ResourceNotFoundException("Compra no encontrada"));
+
+        if (compra.getRutaFactura() == null) {
+            throw new BadRequestException("La compra no tiene archivo adjunto");
+        }
+
+        // Eliminar de Cloudinary
+        cloudinaryService.eliminarArchivo(compra.getRutaFactura());
+
+        // Eliminar referencia en BD
+        compra.setRutaFactura(null);
+        Compra actualizada = compraRepository.save(compra);
+
+        log.info("🗑️ Factura eliminada de Cloudinary para compra: {}", actualizada.getNumeroCompra());
+        return convertirADTO(actualizada);
+    }
+
+    /**
+     * Actualizar estado de compra
      */
     @Transactional
     public CompraDTO.CompraResponse actualizarEstado(Long id, CompraDTO.ActualizarEstadoCompraRequest request, Long usuarioId) {
@@ -189,16 +254,19 @@ public class CompraService {
                         compra.getNumeroCompra()
                 );
             }
+
+            log.info("✅ Stock actualizado para compra: {}", compra.getNumeroCompra());
         }
 
         compra.setEstado(estadoNuevo);
         Compra actualizada = compraRepository.save(compra);
 
+        log.info("✅ Estado actualizado: {} -> {}", estadoAnterior, estadoNuevo);
         return convertirADTO(actualizada);
     }
 
     /**
-     * Eliminar compra (solo si está en estado PENDIENTE)
+     * Eliminar compra
      */
     @Transactional
     public void eliminar(Long id) {
@@ -210,16 +278,18 @@ public class CompraService {
             throw new BadRequestException("Solo se pueden eliminar compras en estado PENDIENTE");
         }
 
+        // Eliminar archivo de Cloudinary si existe
         if (compra.getRutaFactura() != null) {
-            fileStorageService.eliminarArchivo(compra.getRutaFactura());
+            cloudinaryService.eliminarArchivo(compra.getRutaFactura());
+            log.info("🗑️ Archivo eliminado de Cloudinary");
         }
 
         compraRepository.delete(compra);
+        log.info("🗑️ Compra eliminada: {}", compra.getNumeroCompra());
     }
 
     /**
      * Generar número de compra automático
-     * Formato: CMP-2024-0001
      */
     private String generarNumeroCompra() {
         String year = String.valueOf(Year.now().getValue());
@@ -230,28 +300,48 @@ public class CompraService {
         return String.format("CMP-%s-%04d", year, nuevoNumero);
     }
 
-    // Convertir entidad a DTO
+    /**
+     * ✅ ACTUALIZADO: Convertir entidad a DTO
+     * La URL de Cloudinary ya viene completa y es global
+     */
     private CompraDTO.CompraResponse convertirADTO(Compra compra) {
 
         List<CompraDTO.CompraDetalleResponse> detalles = compra.getDetalles().stream()
                 .map(this::convertirDetalleADTO)
                 .collect(Collectors.toList());
 
-        return new CompraDTO.CompraResponse(
-                compra.getId(),
-                compra.getNumeroCompra(),
-                compra.getProveedor().getId(),
-                compra.getProveedor().getNombreEmpresa(),
-                compra.getSede().getId(),
-                compra.getSede().getNombre(),
-                compra.getEstado().name(),
-                compra.getMontoTotal(),
-                compra.getRutaFactura(),
-                compra.getFechaRegistro(),
-                compra.getUsuarioRegistro().getNombreCompleto(),
-                compra.getObservaciones(),
-                detalles
-        );
+        // ✅ La URL de Cloudinary YA ES la URL completa y global
+        // Ejemplo: https://res.cloudinary.com/drdet81ws/image/upload/v123/deybimotors/facturas/archivo.jpg
+        String archivoUrl = compra.getRutaFactura();
+
+        String archivoNombre = null;
+        if (archivoUrl != null) {
+            // Extraer nombre del archivo de la URL
+            String[] partes = archivoUrl.split("/");
+            archivoNombre = partes[partes.length - 1];
+        }
+
+        CompraDTO.CompraResponse response = new CompraDTO.CompraResponse();
+        response.setId(compra.getId());
+        response.setNumeroCompra(compra.getNumeroCompra());
+        response.setProveedorId(compra.getProveedor().getId());
+        response.setProveedorNombre(compra.getProveedor().getNombreEmpresa());
+        response.setSedeId(compra.getSede().getId());
+        response.setSedeNombre(compra.getSede().getNombre());
+        response.setEstado(compra.getEstado().name());
+        response.setMontoTotal(compra.getMontoTotal());
+        response.setRutaFactura(compra.getRutaFactura());
+
+        // URLs globales de Cloudinary
+        response.setArchivoUrl(archivoUrl);
+        response.setArchivoNombre(archivoNombre);
+
+        response.setFechaRegistro(compra.getFechaRegistro());
+        response.setUsuarioRegistro(compra.getUsuarioRegistro().getNombreCompleto());
+        response.setObservaciones(compra.getObservaciones());
+        response.setDetalles(detalles);
+
+        return response;
     }
 
     private CompraDTO.CompraDetalleResponse convertirDetalleADTO(CompraDetalle detalle) {

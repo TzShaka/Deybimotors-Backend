@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * Controlador de Compras - RF-025 a RF-032
- * ✅ ACTUALIZADO: VENDEDOR también puede crear compras y verlas
+ * ✅ ACTUALIZADO: Incluye endpoints para gestión de archivos
  */
 @RestController
 @RequestMapping("/api/compras")
@@ -105,8 +105,6 @@ public class CompraController {
     /**
      * POST /api/compras
      * Crear nueva compra
-     * ✅ ACTUALIZADO: Obtiene usuario autenticado del token
-     * ✅ VENDEDOR también puede crear compras
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO', 'VENDEDOR')")
@@ -119,25 +117,46 @@ public class CompraController {
     }
 
     /**
+     * ✅ NUEVO: PUT /api/compras/{id}
+     * Actualizar compra (proveedor y observaciones)
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO', 'VENDEDOR')")
+    public ResponseEntity<CompraDTO.CompraResponse> actualizar(
+            @PathVariable Long id,
+            @Valid @RequestBody CompraDTO.ActualizarCompraRequest request
+    ) {
+        return ResponseEntity.ok(compraService.actualizar(id, request));
+    }
+
+    /**
      * POST /api/compras/{id}/factura
-     * Subir factura de compra
-     * ✅ VENDEDOR también puede subir facturas
+     * Subir o cambiar factura de compra
      */
     @PostMapping("/{id}/factura")
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO', 'VENDEDOR')")
-    public ResponseEntity<String> subirFactura(
+    public ResponseEntity<CompraDTO.CompraResponse> subirFactura(
             @PathVariable Long id,
             @RequestParam("archivo") MultipartFile archivo
     ) throws IOException {
-        compraService.subirFactura(id, archivo);
-        return ResponseEntity.ok("Factura subida correctamente");
+        CompraDTO.CompraResponse response = compraService.subirFactura(id, archivo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * ✅ NUEVO: DELETE /api/compras/{id}/factura
+     * Eliminar factura de compra
+     */
+    @DeleteMapping("/{id}/factura")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO', 'VENDEDOR')")
+    public ResponseEntity<CompraDTO.CompraResponse> eliminarFactura(@PathVariable Long id) {
+        CompraDTO.CompraResponse response = compraService.eliminarFactura(id);
+        return ResponseEntity.ok(response);
     }
 
     /**
      * PATCH /api/compras/{id}/estado
      * Actualizar estado de compra
-     * ✅ ACTUALIZADO: Obtiene usuario autenticado del token
-     * Solo ADMIN y ALMACENERO pueden cambiar estados
      */
     @PatchMapping("/{id}/estado")
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")

@@ -13,6 +13,7 @@ import java.util.List;
 
 /**
  * DTO para Compra - RF-025 a RF-032
+ * ✅ ACTUALIZADO: Incluye archivoUrl y archivoNombre
  */
 public class CompraDTO {
 
@@ -29,6 +30,11 @@ public class CompraDTO {
         private String estado;
         private BigDecimal montoTotal;
         private String rutaFactura;
+
+        // ✅ NUEVO: URL completa del archivo (para frontend)
+        private String archivoUrl;
+        private String archivoNombre;
+
         private LocalDateTime fechaRegistro;
         private String usuarioRegistro;
         private String observaciones;
@@ -79,6 +85,19 @@ public class CompraDTO {
         @NotNull(message = "El precio unitario es obligatorio")
         @DecimalMin(value = "0.0", inclusive = false, message = "El precio debe ser mayor a 0")
         private BigDecimal precioUnitario;
+
+        private String observaciones;
+    }
+
+    /**
+     * ✅ NUEVO: DTO para actualizar compra
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ActualizarCompraRequest {
+        @NotNull(message = "El proveedor es obligatorio")
+        private Long proveedorId;
 
         private String observaciones;
     }

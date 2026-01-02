@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 
 /**
  * Controlador de Exportaciones - RF-016, RF-017, RF-038
+ * ✅ ACTUALIZADO: Agregado endpoint para exportar productos a PDF
  * Endpoints: /api/exportar/**
  */
 @RestController
@@ -43,6 +44,27 @@ public class ExportController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(excelBytes);
+    }
+
+    /**
+     * ✅ NUEVO ENDPOINT
+     * GET /api/exportar/productos/pdf
+     * Exportar lista de productos a PDF - RF-016
+     */
+    @GetMapping("/productos/pdf")
+    public ResponseEntity<byte[]> exportarProductosPDF(
+            @RequestParam(required = false) Long sedeId
+    ) throws IOException {
+
+        byte[] pdfBytes = exportService.exportarProductosPDF(sedeId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "productos.pdf");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdfBytes);
     }
 
     /**

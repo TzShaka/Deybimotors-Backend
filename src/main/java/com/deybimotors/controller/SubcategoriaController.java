@@ -13,6 +13,7 @@ import java.util.List;
 
 /**
  * Controlador de Subcategorías - RF-046 a RF-049
+ * ✅ ACTUALIZADO: Agregado endpoint /categoria/{categoriaId}/activas
  * Endpoints: /api/subcategorias/**
  */
 @RestController
@@ -48,6 +49,18 @@ public class SubcategoriaController {
     @GetMapping("/categoria/{categoriaId}")
     public ResponseEntity<List<GenericDTO.SubcategoriaResponse>> listarPorCategoria(@PathVariable Long categoriaId) {
         return ResponseEntity.ok(subcategoriaService.listarPorCategoria(categoriaId));
+    }
+
+    /**
+     * ✅ NUEVO ENDPOINT
+     * GET /api/subcategorias/categoria/{categoriaId}/activas
+     * Listar subcategorías ACTIVAS por categoría
+     */
+    @GetMapping("/categoria/{categoriaId}/activas")
+    public ResponseEntity<List<GenericDTO.SubcategoriaResponse>> listarActivasPorCategoria(
+            @PathVariable Long categoriaId
+    ) {
+        return ResponseEntity.ok(subcategoriaService.listarActivasPorCategoria(categoriaId));
     }
 
     /**

@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * Servicio de Subcategorías - RF-046 a RF-049
+ * ✅ ACTUALIZADO: Agregado método listarActivasPorCategoria
  */
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,17 @@ public class SubcategoriaService {
     @Transactional(readOnly = true)
     public List<GenericDTO.SubcategoriaResponse> listarPorCategoria(Long categoriaId) {
         return subcategoriaRepository.findByCategoriaId(categoriaId).stream()
+                .map(this::convertirADTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * ✅ NUEVO MÉTODO
+     * Listar subcategorías ACTIVAS por categoría
+     */
+    @Transactional(readOnly = true)
+    public List<GenericDTO.SubcategoriaResponse> listarActivasPorCategoria(Long categoriaId) {
+        return subcategoriaRepository.findByCategoriaIdAndActivoTrue(categoriaId).stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
@@ -100,7 +112,7 @@ public class SubcategoriaService {
         Subcategoria subcategoria = subcategoriaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subcategoría no encontrada"));
 
-        // Validar integridad referencial - RF-049 - ✅ CORREGIDO
+        // Validar integridad referencial
         long productosAsociados = productoRepository.countBySubcategoriaId(id);
 
         if (productosAsociados > 0) {

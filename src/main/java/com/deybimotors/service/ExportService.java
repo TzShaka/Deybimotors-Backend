@@ -28,8 +28,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Servicio de Exportaciones - ✅ CORREGIDO
+ * Servicio de Exportaciones - ✅ ACTUALIZADO
  * RF-016, RF-017, RF-038
+ * ✅ AGREGADO: Exportar productos a PDF
  */
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,94 @@ public class ExportService {
 
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /**
+     * ✅ NUEVO: Exportar lista de productos a PDF - RF-016
+     */
+    @Transactional(readOnly = true)
+    public byte[] exportarProductosPDF(Long sedeId) throws IOException {
+
+        List<Producto> productos = sedeId != null
+                ? productoRepository.findBySedeId(sedeId)
+                : productoRepository.findByEstadoTrue();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        Document document = new Document(pdfDoc, PageSize.A4.rotate());
+
+        // Título
+        Paragraph titulo = new Paragraph("REPORTE DE PRODUCTOS")
+                .setFontSize(16)
+                .setBold()
+                .setTextAlignment(TextAlignment.CENTER);
+        document.add(titulo);
+
+        Paragraph fecha = new Paragraph(
+                "Fecha: " + LocalDateTime.now().format(DATE_FORMATTER)
+        ).setFontSize(10).setTextAlignment(TextAlignment.CENTER);
+        document.add(fecha);
+
+        document.add(new Paragraph("\n"));
+
+        // Tabla
+        float[] columnWidths = {8, 15, 10, 10, 8, 10, 10};
+        Table table = new Table(UnitValue.createPercentArray(columnWidths));
+        table.setWidth(UnitValue.createPercentValue(100));
+
+        // Headers
+        String[] headers = {
+                "Código", "Descripción", "Categoría", "Marca", "Stock", "P. Costo", "P. Venta"
+        };
+
+        for (String header : headers) {
+            com.itextpdf.layout.element.Cell cell =
+                    new com.itextpdf.layout.element.Cell()
+                            .add(new Paragraph(header).setBold())
+                            .setBackgroundColor(ColorConstants.LIGHT_GRAY)
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setFontSize(9);
+            table.addHeaderCell(cell);
+        }
+
+        // Datos
+        for (Producto p : productos) {
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(p.getCodigoInterno())).setFontSize(8));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(p.getDescripcion() != null ? p.getDescripcion() : "")).setFontSize(8));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(p.getCategoria().getNombre())).setFontSize(8));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(p.getMarcaProducto().getNombre())).setFontSize(8));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(String.valueOf(p.getStock())))
+                    .setFontSize(8)
+                    .setTextAlignment(TextAlignment.CENTER));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(
+                            p.getPrecioCosto() != null
+                                    ? String.format("S/ %.2f", p.getPrecioCosto())
+                                    : "S/ 0.00"
+                    )).setFontSize(8));
+            table.addCell(new com.itextpdf.layout.element.Cell()
+                    .add(new Paragraph(String.format("S/ %.2f", p.getPrecioVenta()))).setFontSize(8));
+        }
+
+        document.add(table);
+
+        // Resumen
+        document.add(new Paragraph("\n"));
+        Paragraph resumen = new Paragraph(
+                String.format("Total de productos: %d", productos.size())
+        ).setFontSize(10).setBold();
+        document.add(resumen);
+
+        document.close();
+
+        log.info("Productos exportados a PDF: {} registros", productos.size());
+        return baos.toByteArray();
+    }
 
     /**
      * Exportar lista de productos a Excel - RF-016
@@ -231,7 +320,6 @@ public class ExportService {
 
     /**
      * Exportar productos con stock bajo a Excel - RF-017
-     * ✅ CORREGIDO: Línea 187 - Variable 'diferencia' definida correctamente
      */
     @Transactional(readOnly = true)
     public byte[] exportarProductosStockBajoExcel(Long sedeId) throws IOException {
@@ -271,7 +359,6 @@ public class ExportService {
             row.createCell(2).setCellValue(producto.getCategoria().getNombre());
             row.createCell(3).setCellValue(producto.getStock());
 
-            // ✅ CORREGIDO: Estado en lugar de diferencia
             String estado = producto.getStock() == 0 ? "AGOTADO" :
                     producto.getStock() <= 2 ? "STOCK BAJO" : "NORMAL";
             row.createCell(4).setCellValue(estado);

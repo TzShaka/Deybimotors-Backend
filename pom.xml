@@ -90,7 +90,7 @@
 			<version>5.2.5</version>
 		</dependency>
 
-		<!-- ✅ NUEVO: iText 7 para PDF -->
+		<!-- iText 7 para PDF -->
 		<dependency>
 			<groupId>com.itextpdf</groupId>
 			<artifactId>itext7-core</artifactId>
@@ -108,7 +108,7 @@
 			<version>7.2.5</version>
 		</dependency>
 
-		<!-- ✅ NUEVO: ZXing para códigos de barras -->
+		<!-- ZXing para códigos de barras -->
 		<dependency>
 			<groupId>com.google.zxing</groupId>
 			<artifactId>core</artifactId>
@@ -118,6 +118,13 @@
 			<groupId>com.google.zxing</groupId>
 			<artifactId>javase</artifactId>
 			<version>3.5.2</version>
+		</dependency>
+
+		<!-- ✅ NUEVO: Cloudinary para almacenamiento en la nube -->
+		<dependency>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http44</artifactId>
+			<version>1.36.0</version>
 		</dependency>
 
 		<!-- ModelMapper -->
