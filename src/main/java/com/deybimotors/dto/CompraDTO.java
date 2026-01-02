@@ -107,6 +107,6 @@ public class CompraDTO {
     @AllArgsConstructor
     public static class ActualizarEstadoCompraRequest {
         @NotNull(message = "El estado es obligatorio")
-        private String estado; // PENDIENTE, COMPLETADO, CANCELADO
+        private String estado;
     }
 }

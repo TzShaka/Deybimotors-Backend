@@ -234,16 +234,11 @@ public class CompraService {
         Compra.EstadoCompra estadoAnterior = compra.getEstado();
         Compra.EstadoCompra estadoNuevo = Compra.EstadoCompra.valueOf(request.getEstado().toUpperCase());
 
-        if (estadoAnterior == Compra.EstadoCompra.COMPLETADO) {
+        if (estadoAnterior == Compra.EstadoCompra.PAGADO) {
             throw new BadRequestException("No se puede modificar una compra completada");
         }
 
-        if (estadoAnterior == Compra.EstadoCompra.CANCELADO) {
-            throw new BadRequestException("No se puede modificar una compra cancelada");
-        }
-
-        // Si el nuevo estado es COMPLETADO, actualizar stock
-        if (estadoNuevo == Compra.EstadoCompra.COMPLETADO && estadoAnterior != Compra.EstadoCompra.COMPLETADO) {
+        if (estadoNuevo == Compra.EstadoCompra.PAGADO && estadoAnterior != Compra.EstadoCompra.PAGADO) {
 
             for (CompraDetalle detalle : compra.getDetalles()) {
                 stockService.incrementarStock(

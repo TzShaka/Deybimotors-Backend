@@ -74,7 +74,7 @@ public class Compra {
     // Estados posibles de una compra
     public enum EstadoCompra {
         PENDIENTE,      // Registrada pero no completada
-        COMPLETADO,     // Completada y stock actualizado
-        CANCELADO       // Cancelada
+        PAGADO,     // Completada y stock actualizado
+              // Cancelada
     }
 }
