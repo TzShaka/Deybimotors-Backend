@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Compra - ✅ ACTUALIZADA para BD real
- * Campos corregidos según estructura real de BD
+ * Entidad Compra - ✅ ACTUALIZADA
+ * Estados: PENDIENTE y PAGADO únicamente
  */
 @Entity
 @Table(name = "compras")
@@ -27,7 +27,6 @@ public class Compra {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ✅ CORRECCIÓN: numero_compra en BD (antes numero_factura)
     @Column(nullable = false, unique = true, length = 50, name = "numero_compra")
     private String numeroCompra;
 
@@ -39,7 +38,6 @@ public class Compra {
     @JoinColumn(name = "sede_id", nullable = false)
     private Sede sede;
 
-    // ✅ CORRECCIÓN: ruta_factura en BD (antes archivo_factura_url)
     @Column(length = 500, name = "ruta_factura")
     private String rutaFactura;
 
@@ -47,7 +45,6 @@ public class Compra {
     @Column(nullable = false, length = 20)
     private EstadoCompra estado = EstadoCompra.PENDIENTE;
 
-    // ✅ NUEVO: Campo agregado por migración
     @Column(nullable = false, precision = 12, scale = 2, name = "monto_total")
     private BigDecimal montoTotal = BigDecimal.ZERO;
 
@@ -55,7 +52,6 @@ public class Compra {
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuarioRegistro;
 
-    // ✅ CORRECCIÓN: fecha_registro en BD (antes fecha_creacion)
     @CreationTimestamp
     @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaRegistro;
@@ -67,14 +63,14 @@ public class Compra {
     @Column(length = 1000)
     private String observaciones;
 
-    // Detalle de la compra
     @OneToMany(mappedBy = "compra", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CompraDetalle> detalles = new ArrayList<>();
 
-    // Estados posibles de una compra
+    /**
+     * ✅ Estados posibles: Solo PENDIENTE y PAGADO
+     */
     public enum EstadoCompra {
-        PENDIENTE,      // Registrada pero no completada
-        PAGADO,     // Completada y stock actualizado
-              // Cancelada
+        PENDIENTE,  // Registrada pero no completada
+        PAGADO      // Completada y stock actualizado
     }
 }
