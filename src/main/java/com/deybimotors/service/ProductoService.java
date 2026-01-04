@@ -21,7 +21,9 @@ import java.util.stream.Collectors;
 
 /**
  * Servicio de Productos - ✅ CORREGIDO FINAL
- * Con manejo completo de valores NULL
+ * - SIN codigo_referencia
+ * - CON codigosOem desde producto_oem
+ * - CON compatibilidades completas
  */
 @Service
 @RequiredArgsConstructor
@@ -36,19 +38,12 @@ public class ProductoService {
     private final CodigoPrecioRepository codigoPrecioRepository;
     private final MovimientoKardexRepository kardexRepository;
     private final FileStorageService fileStorageService;
+    private final CodigoOemRepository codigoOemRepository;
+    private final CompatibilidadRepository compatibilidadRepository;
 
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoResponse> listarTodos() {
         List<Producto> productos = productoRepository.findByEstadoTrue();
-
-        // ✅ DEBUG
-        System.out.println("========================================");
-        System.out.println("Productos encontrados: " + productos.size());
-        for (Producto p : productos) {
-            System.out.println("- ID: " + p.getId() + " | Código: " + p.getCodigoInterno() + " | Desc: " + p.getDescripcion());
-        }
-        System.out.println("========================================");
-
         return productos.stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
@@ -176,7 +171,6 @@ public class ProductoService {
         producto.setSede(sede);
         producto.setCodigoInterno(request.getCodigo());
         producto.setCodigoMarca(request.getCodigoMarca());
-        producto.setCodigoReferencia(request.getCodigoReferencia());
         producto.setDescripcion(request.getNombre());
         producto.setCategoria(categoria);
         producto.setSubcategoria(subcategoria);
@@ -231,7 +225,6 @@ public class ProductoService {
         }
 
         producto.setCodigoMarca(request.getCodigoMarca());
-        producto.setCodigoReferencia(request.getCodigoReferencia());
         producto.setDescripcion(request.getNombre());
         producto.setMedida(request.getMedida());
         producto.setDiametro(request.getDiametro());
@@ -325,6 +318,94 @@ public class ProductoService {
         }
     }
 
+    // ========================================
+    // MÉTODOS AUXILIARES - ✅ CORREGIDOS
+    // ========================================
+
+    private ProductoDTO.ProductoResponse convertirADTO(Producto producto) {
+        ProductoDTO.ProductoResponse dto = new ProductoDTO.ProductoResponse();
+
+        try {
+            copiarDatosBasicos(producto, dto);
+            dto.setStockTotal(producto.getStock());
+
+            // ✅ CÓDIGOS OEM - Extraer de la relación producto_oem
+            if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
+                List<String> codigosOemList = producto.getCodigosOem().stream()
+                        .map(po -> po.getCodigoOem().getCodigoOem())
+                        .collect(Collectors.toList());
+                dto.setCodigosOem(codigosOemList);
+            }
+
+            // ✅ COMPATIBILIDADES - Extraer completas
+            if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
+                List<ProductoDTO.CompatibilidadInfo> compatList = producto.getCompatibilidades().stream()
+                        .map(c -> new ProductoDTO.CompatibilidadInfo(
+                                c.getId(),
+                                c.getMarcaAutomovil() != null ? c.getMarcaAutomovil().getNombre() : null,
+                                c.getModeloAutomovil() != null ? c.getModeloAutomovil().getNombre() : null,
+                                c.getAnio(),
+                                c.getMotor()
+                        ))
+                        .collect(Collectors.toList());
+                dto.setCompatibilidades(compatList);
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ Error convirtiendo producto ID " + producto.getId() + ": " + e.getMessage());
+            e.printStackTrace();
+
+            // DTO con datos mínimos
+            dto.setId(producto.getId());
+            dto.setCodigo(producto.getCodigoInterno());
+            dto.setDescripcion(producto.getDescripcion());
+            dto.setStockTotal(producto.getStock());
+            dto.setActivo(producto.getEstado());
+        }
+
+        return dto;
+    }
+
+    private void copiarDatosBasicos(Producto producto, ProductoDTO.ProductoResponse dto) {
+        dto.setId(producto.getId());
+        dto.setCodigo(producto.getCodigoInterno());
+        dto.setCodigoMarca(producto.getCodigoMarca());
+        dto.setDescripcion(producto.getDescripcion());
+
+        // Categoría
+        if (producto.getCategoria() != null) {
+            dto.setCategoriaId(producto.getCategoria().getId());
+            dto.setCategoriaNombre(producto.getCategoria().getNombre());
+        }
+
+        // Subcategoría
+        if (producto.getSubcategoria() != null) {
+            dto.setSubcategoriaId(producto.getSubcategoria().getId());
+            dto.setSubcategoriaNombre(producto.getSubcategoria().getNombre());
+        }
+
+        // Marca
+        if (producto.getMarcaProducto() != null) {
+            dto.setMarcaId(producto.getMarcaProducto().getId());
+            dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
+        }
+
+        dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
+        dto.setMedida(producto.getMedida());
+        dto.setDiametro(producto.getDiametro());
+        dto.setTipo(producto.getTipo());
+        dto.setMedida2(producto.getMedida2());
+
+        dto.setPrecioVenta(producto.getPrecioVenta());
+        dto.setPrecioCosto(producto.getPrecioCosto());
+        dto.setCodigoPrecio(producto.getCodigoPrecio() != null ? producto.getCodigoPrecio().getCodigo() : null);
+
+        dto.setActivo(producto.getEstado());
+        dto.setPublicoCatalogo(producto.getPublicoCatalogo());
+        dto.setFechaCreacion(producto.getFechaCreacion());
+        dto.setFotoUrl(producto.getFotoUrl());
+    }
+
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoCatalogoPublicoResponse> listarCatalogoPublico(
             Long categoriaId,
@@ -351,109 +432,6 @@ public class ProductoService {
                 .collect(Collectors.toList());
     }
 
-    // ========================================
-    // MÉTODOS AUXILIARES - ✅ CORREGIDOS
-    // ========================================
-
-    private ProductoDTO.ProductoResponse convertirADTO(Producto producto) {
-        ProductoDTO.ProductoResponse dto = new ProductoDTO.ProductoResponse();
-
-        try {
-            copiarDatosBasicos(producto, dto);
-            dto.setStockTotal(producto.getStock());
-        } catch (Exception e) {
-            System.err.println("❌ Error convirtiendo producto ID " + producto.getId() + ": " + e.getMessage());
-            e.printStackTrace();
-
-            // DTO con datos mínimos
-            dto.setId(producto.getId());
-            dto.setCodigo(producto.getCodigoInterno());
-            dto.setDescripcion(producto.getDescripcion());
-            dto.setStockTotal(producto.getStock());
-            dto.setActivo(producto.getEstado());
-        }
-
-        return dto;
-    }
-
-    private void copiarDatosBasicos(Producto producto, ProductoDTO.ProductoResponse dto) {
-        dto.setId(producto.getId());
-        dto.setCodigo(producto.getCodigoInterno());
-        dto.setCodigoMarca(producto.getCodigoMarca());
-        dto.setCodigoReferencia(producto.getCodigoReferencia());
-
-        // ✅ Manejo seguro de codigosOem
-        if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
-            try {
-                dto.setCodigoOem(producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem());
-            } catch (Exception e) {
-                dto.setCodigoOem(null);
-            }
-        } else {
-            dto.setCodigoOem(null);
-        }
-
-        dto.setDescripcion(producto.getDescripcion());
-
-        // ✅ Manejo seguro de categoría
-        if (producto.getCategoria() != null) {
-            dto.setCategoriaId(producto.getCategoria().getId());
-            dto.setCategoriaNombre(producto.getCategoria().getNombre());
-        }
-
-        // ✅ Manejo seguro de subcategoría
-        if (producto.getSubcategoria() != null) {
-            dto.setSubcategoriaId(producto.getSubcategoria().getId());
-            dto.setSubcategoriaNombre(producto.getSubcategoria().getNombre());
-        }
-
-        // ✅ Manejo seguro de marca
-        if (producto.getMarcaProducto() != null) {
-            dto.setMarcaId(producto.getMarcaProducto().getId());
-            dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
-        }
-
-        // ✅ Manejo seguro de compatibilidades
-        if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
-            try {
-                Compatibilidad compat = producto.getCompatibilidades().get(0);
-                if (compat.getMarcaAutomovil() != null) {
-                    dto.setMarcaAutomovil(compat.getMarcaAutomovil().getNombre());
-                }
-                if (compat.getModeloAutomovil() != null) {
-                    dto.setModeloAutomovil(compat.getModeloAutomovil().getNombre());
-                }
-                dto.setAnio(compat.getAnio());
-                dto.setMotor(compat.getMotor());
-            } catch (Exception e) {
-                dto.setMarcaAutomovil(null);
-                dto.setModeloAutomovil(null);
-                dto.setAnio(null);
-                dto.setMotor(null);
-            }
-        } else {
-            dto.setMarcaAutomovil(null);
-            dto.setModeloAutomovil(null);
-            dto.setAnio(null);
-            dto.setMotor(null);
-        }
-
-        dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
-        dto.setMedida(producto.getMedida());
-        dto.setDiametro(producto.getDiametro());
-        dto.setTipo(producto.getTipo());
-        dto.setMedida2(producto.getMedida2());
-
-        dto.setPrecioVenta(producto.getPrecioVenta());
-        dto.setPrecioCosto(producto.getPrecioCosto());
-        dto.setCodigoPrecio(producto.getCodigoPrecio() != null ? producto.getCodigoPrecio().getCodigo() : null);
-
-        dto.setActivo(producto.getEstado());
-        dto.setPublicoCatalogo(producto.getPublicoCatalogo());
-        dto.setFechaCreacion(producto.getFechaCreacion());
-        dto.setFotoUrl(producto.getFotoUrl());
-    }
-
     private ProductoDTO.ProductoCatalogoPublicoResponse convertirACatalogoPublicoDTO(Producto producto) {
         ProductoDTO.ProductoCatalogoPublicoResponse dto = new ProductoDTO.ProductoCatalogoPublicoResponse();
 
@@ -465,17 +443,6 @@ public class ProductoService {
         dto.setCategoriaNombre(producto.getCategoria() != null ? producto.getCategoria().getNombre() : null);
         dto.setSubcategoriaNombre(producto.getSubcategoria() != null ? producto.getSubcategoria().getNombre() : null);
         dto.setMarcaNombre(producto.getMarcaProducto() != null ? producto.getMarcaProducto().getNombre() : null);
-
-        if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
-            try {
-                Compatibilidad compat = producto.getCompatibilidades().get(0);
-                dto.setMarcaAutomovil(compat.getMarcaAutomovil() != null ? compat.getMarcaAutomovil().getNombre() : null);
-                dto.setModeloAutomovil(compat.getModeloAutomovil() != null ? compat.getModeloAutomovil().getNombre() : null);
-                dto.setMotor(compat.getMotor());
-            } catch (Exception e) {
-                // Silenciosamente manejar error
-            }
-        }
 
         dto.setOrigen(producto.getOrigen() != null ? producto.getOrigen().getPais() : null);
         dto.setMedida(producto.getMedida());
@@ -493,6 +460,28 @@ public class ProductoService {
         }
 
         dto.setFotoUrl(producto.getFotoUrl());
+
+        // ✅ CÓDIGOS OEM
+        if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
+            List<String> codigosOemList = producto.getCodigosOem().stream()
+                    .map(po -> po.getCodigoOem().getCodigoOem())
+                    .collect(Collectors.toList());
+            dto.setCodigosOem(codigosOemList);
+        }
+
+        // ✅ COMPATIBILIDADES
+        if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
+            List<ProductoDTO.CompatibilidadInfo> compatList = producto.getCompatibilidades().stream()
+                    .map(c -> new ProductoDTO.CompatibilidadInfo(
+                            c.getId(),
+                            c.getMarcaAutomovil() != null ? c.getMarcaAutomovil().getNombre() : null,
+                            c.getModeloAutomovil() != null ? c.getModeloAutomovil().getNombre() : null,
+                            c.getAnio(),
+                            c.getMotor()
+                    ))
+                    .collect(Collectors.toList());
+            dto.setCompatibilidades(compatList);
+        }
 
         return dto;
     }

@@ -9,12 +9,13 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO para Producto - ✅ CORREGIDO
- * - UN SOLO campo fotoUrl (String)
- * - SIN stock_minimo
- * - CON publicoCatalogo
+ * - SIN codigo_referencia
+ * - CON lista de codigosOem (desde producto_oem)
+ * - CON lista de compatibilidades
  */
 public class ProductoDTO {
 
@@ -25,8 +26,6 @@ public class ProductoDTO {
         private Long id;
         private String codigo;
         private String codigoMarca;
-        private String codigoReferencia;
-        private String codigoOem;
         private String descripcion;
 
         // Categorización
@@ -36,12 +35,6 @@ public class ProductoDTO {
         private String subcategoriaNombre;
         private Long marcaId;
         private String marcaNombre;
-
-        // Datos del vehículo
-        private String marcaAutomovil;
-        private String modeloAutomovil;
-        private String anio;
-        private String motor;
 
         // Especificaciones técnicas
         private String origen;
@@ -60,11 +53,28 @@ public class ProductoDTO {
         private Boolean publicoCatalogo;
         private LocalDateTime fechaCreacion;
 
-        // ✅ FOTO - UN SOLO CAMPO
+        // Foto
         private String fotoUrl;
 
         // Stock
         private Integer stockTotal;
+
+        // ✅ CÓDIGOS OEM - Lista completa
+        private List<String> codigosOem;
+
+        // ✅ COMPATIBILIDADES - Lista completa
+        private List<CompatibilidadInfo> compatibilidades;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CompatibilidadInfo {
+        private Long id;
+        private String marcaAutomovil;
+        private String modeloAutomovil;
+        private String anio;
+        private String motor;
     }
 
     @Data
@@ -82,8 +92,6 @@ public class ProductoDTO {
         private String codigo;
 
         private String codigoMarca;
-        private String codigoReferencia;
-        private String codigoOem;
 
         @NotBlank(message = "El nombre es obligatorio")
         private String nombre;
@@ -98,12 +106,6 @@ public class ProductoDTO {
 
         @NotNull(message = "La sede es obligatoria")
         private Long sedeId;
-
-        // Datos del vehículo
-        private String marcaAutomovil;
-        private String modeloAutomovil;
-        private String anio;
-        private String motor;
 
         // Especificaciones
         private String origen;
@@ -123,7 +125,21 @@ public class ProductoDTO {
         private Boolean publicoCatalogo = false;
         private String observaciones;
 
-        // ✅ SIN fotoUrl - Las fotos se suben por separado con MultipartFile
+        // ✅ CÓDIGOS OEM - Lista de IDs para asignar
+        private List<Long> codigosOemIds;
+
+        // ✅ COMPATIBILIDADES - Lista para crear
+        private List<CompatibilidadRequest> compatibilidades;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CompatibilidadRequest {
+        private Long marcaAutomovilId;
+        private Long modeloAutomovilId;
+        private String anio;
+        private String motor;
     }
 
     @Data
@@ -140,11 +156,6 @@ public class ProductoDTO {
         private String subcategoriaNombre;
         private String marcaNombre;
 
-        // Datos del vehículo
-        private String marcaAutomovil;
-        private String modeloAutomovil;
-        private String motor;
-
         // Especificaciones
         private String origen;
         private String medida;
@@ -153,9 +164,15 @@ public class ProductoDTO {
 
         // Precio y disponibilidad
         private BigDecimal precioVenta;
-        private String disponibilidad; // DISPONIBLE, ULTIMAS_UNIDADES, AGOTADO
+        private String disponibilidad;
 
-        // ✅ FOTO - UN SOLO CAMPO
+        // Foto
         private String fotoUrl;
+
+        // ✅ CÓDIGOS OEM
+        private List<String> codigosOem;
+
+        // ✅ COMPATIBILIDADES
+        private List<CompatibilidadInfo> compatibilidades;
     }
 }

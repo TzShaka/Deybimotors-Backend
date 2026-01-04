@@ -26,11 +26,11 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * Servicio de Exportaciones - ✅ ACTUALIZADO
- * RF-016, RF-017, RF-038
- * ✅ AGREGADO: Exportar productos a PDF
+ * Servicio de Exportaciones - ✅ CORREGIDO
+ * SIN codigo_referencia
  */
 @Service
 @RequiredArgsConstructor
@@ -43,9 +43,6 @@ public class ExportService {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    /**
-     * ✅ NUEVO: Exportar lista de productos a PDF - RF-016
-     */
     @Transactional(readOnly = true)
     public byte[] exportarProductosPDF(Long sedeId) throws IOException {
 
@@ -58,7 +55,6 @@ public class ExportService {
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc, PageSize.A4.rotate());
 
-        // Título
         Paragraph titulo = new Paragraph("REPORTE DE PRODUCTOS")
                 .setFontSize(16)
                 .setBold()
@@ -72,12 +68,10 @@ public class ExportService {
 
         document.add(new Paragraph("\n"));
 
-        // Tabla
         float[] columnWidths = {8, 15, 10, 10, 8, 10, 10};
         Table table = new Table(UnitValue.createPercentArray(columnWidths));
         table.setWidth(UnitValue.createPercentValue(100));
 
-        // Headers
         String[] headers = {
                 "Código", "Descripción", "Categoría", "Marca", "Stock", "P. Costo", "P. Venta"
         };
@@ -92,7 +86,6 @@ public class ExportService {
             table.addHeaderCell(cell);
         }
 
-        // Datos
         for (Producto p : productos) {
             table.addCell(new com.itextpdf.layout.element.Cell()
                     .add(new Paragraph(p.getCodigoInterno())).setFontSize(8));
@@ -118,7 +111,6 @@ public class ExportService {
 
         document.add(table);
 
-        // Resumen
         document.add(new Paragraph("\n"));
         Paragraph resumen = new Paragraph(
                 String.format("Total de productos: %d", productos.size())
@@ -131,9 +123,6 @@ public class ExportService {
         return baos.toByteArray();
     }
 
-    /**
-     * Exportar lista de productos a Excel - RF-016
-     */
     @Transactional(readOnly = true)
     public byte[] exportarProductosExcel(Long sedeId) throws IOException {
 
@@ -144,7 +133,6 @@ public class ExportService {
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Productos");
 
-        // Estilos
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
         headerFont.setBold(true);
@@ -154,16 +142,13 @@ public class ExportService {
         headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         headerStyle.setAlignment(HorizontalAlignment.CENTER);
 
-        // Estilo para precios
         CellStyle precioStyle = workbook.createCellStyle();
         precioStyle.setDataFormat(workbook.createDataFormat().getFormat("S/ #,##0.00"));
 
-        // COLUMNAS
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
                 "Código",
                 "Código Marca",
-                "Código Ref",
                 "Código OEM",
                 "Descripción",
                 "Categoría",
@@ -191,53 +176,41 @@ public class ExportService {
             cell.setCellStyle(headerStyle);
         }
 
-        // DATOS
         int rowNum = 1;
         for (Producto producto : productos) {
             Row row = sheet.createRow(rowNum++);
 
             int colNum = 0;
 
-            // Código
             row.createCell(colNum++).setCellValue(producto.getCodigoInterno());
 
-            // Código Marca
             row.createCell(colNum++).setCellValue(
                     producto.getCodigoMarca() != null ? producto.getCodigoMarca() : ""
             );
 
-            // Código Referencia
-            row.createCell(colNum++).setCellValue(
-                    producto.getCodigoReferencia() != null ? producto.getCodigoReferencia() : ""
-            );
-
-            // Código OEM
             String codigoOem = "";
-            if (!producto.getCodigosOem().isEmpty()) {
-                codigoOem = producto.getCodigosOem().get(0).getCodigoOem().getCodigoOem();
+            if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
+                codigoOem = producto.getCodigosOem().stream()
+                        .map(po -> po.getCodigoOem().getCodigoOem())
+                        .collect(Collectors.joining(", "));
             }
             row.createCell(colNum++).setCellValue(codigoOem);
 
-            // Descripción
             row.createCell(colNum++).setCellValue(producto.getDescripcion());
 
-            // Categoría
             row.createCell(colNum++).setCellValue(producto.getCategoria().getNombre());
 
-            // Subcategoría
             row.createCell(colNum++).setCellValue(
                     producto.getSubcategoria() != null ? producto.getSubcategoria().getNombre() : ""
             );
 
-            // Marca
             row.createCell(colNum++).setCellValue(producto.getMarcaProducto().getNombre());
 
-            // Marca Automóvil, Modelo, Año, Motor
             String marcaAuto = "";
             String modeloAuto = "";
             String anio = "";
             String motor = "";
-            if (!producto.getCompatibilidades().isEmpty()) {
+            if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
                 Compatibilidad compat = producto.getCompatibilidades().get(0);
                 if (compat.getMarcaAutomovil() != null) {
                     marcaAuto = compat.getMarcaAutomovil().getNombre();
@@ -253,59 +226,48 @@ public class ExportService {
             row.createCell(colNum++).setCellValue(anio);
             row.createCell(colNum++).setCellValue(motor);
 
-            // Origen
             row.createCell(colNum++).setCellValue(
                     producto.getOrigen() != null ? producto.getOrigen().getPais() : ""
             );
 
-            // Medida
             row.createCell(colNum++).setCellValue(
                     producto.getMedida() != null ? producto.getMedida() : ""
             );
 
-            // Diámetro
             row.createCell(colNum++).setCellValue(
                     producto.getDiametro() != null ? producto.getDiametro() : ""
             );
 
-            // Tipo
             row.createCell(colNum++).setCellValue(
                     producto.getTipo() != null ? producto.getTipo() : ""
             );
 
-            // Medida 2
             row.createCell(colNum++).setCellValue(
                     producto.getMedida2() != null ? producto.getMedida2() : ""
             );
 
-            // Stock
             row.createCell(colNum++).setCellValue(producto.getStock());
 
-            // Precio Costo
             Cell precioCostoCell = row.createCell(colNum++);
             precioCostoCell.setCellValue(
                     producto.getPrecioCosto() != null ? producto.getPrecioCosto().doubleValue() : 0
             );
             precioCostoCell.setCellStyle(precioStyle);
 
-            // Precio Venta
             Cell precioVentaCell = row.createCell(colNum++);
             precioVentaCell.setCellValue(producto.getPrecioVenta().doubleValue());
             precioVentaCell.setCellStyle(precioStyle);
 
-            // Código Precio
             row.createCell(colNum++).setCellValue(
                     producto.getCodigoPrecio() != null ? producto.getCodigoPrecio().getCodigo() : ""
             );
 
-            // Sede
             row.createCell(colNum++).setCellValue(producto.getSede().getNombre());
         }
 
-        // Ajustar columnas
         for (int i = 0; i < columnas.length; i++) {
             sheet.autoSizeColumn(i);
-            if (i == 4) { // Descripción
+            if (i == 3) {
                 sheet.setColumnWidth(i, 8000);
             }
         }
@@ -318,9 +280,6 @@ public class ExportService {
         return baos.toByteArray();
     }
 
-    /**
-     * Exportar productos con stock bajo a Excel - RF-017
-     */
     @Transactional(readOnly = true)
     public byte[] exportarProductosStockBajoExcel(Long sedeId) throws IOException {
 
@@ -329,7 +288,6 @@ public class ExportService {
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Productos Stock Bajo");
 
-        // Estilos
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
         headerFont.setBold(true);
@@ -337,7 +295,6 @@ public class ExportService {
         headerStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
         headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-        // Cabecera
         Row headerRow = sheet.createRow(0);
         String[] columnas = {
                 "Código", "Descripción", "Categoría", "Stock Actual", "Estado"
@@ -349,7 +306,6 @@ public class ExportService {
             cell.setCellStyle(headerStyle);
         }
 
-        // Datos
         int rowNum = 1;
         for (Producto producto : productos) {
             Row row = sheet.createRow(rowNum++);
@@ -376,9 +332,6 @@ public class ExportService {
         return baos.toByteArray();
     }
 
-    /**
-     * Exportar kardex a PDF - RF-038
-     */
     @Transactional(readOnly = true)
     public byte[] exportarKardexPDF(Long productoId, LocalDateTime fechaInicio, LocalDateTime fechaFin)
             throws IOException {

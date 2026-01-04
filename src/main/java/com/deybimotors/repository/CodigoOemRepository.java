@@ -6,6 +6,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+/**
+ * Repositorio para CodigoOem
+ */
 @Repository
 public interface CodigoOemRepository extends JpaRepository<CodigoOem, Long> {
     Optional<CodigoOem> findByCodigoOem(String codigoOem);

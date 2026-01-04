@@ -14,7 +14,8 @@ import java.util.List;
 
 /**
  * Entidad Producto - ✅ CORREGIDO FINAL
- * Sin métodos de compatibilidad que causan conflicto con Jackson
+ * - SIN codigo_referencia
+ * - CON relaciones correctas a producto_oem y compatibilidades
  */
 @Entity
 @Table(name = "productos")
@@ -34,8 +35,7 @@ public class Producto {
     @Column(length = 50, name = "codigo_marca")
     private String codigoMarca;
 
-    @Column(length = 50, name = "codigo_referencia")
-    private String codigoReferencia;
+    // ✅ ELIMINADO: codigo_referencia
 
     @Column(nullable = false, unique = true, length = 50, name = "codigo_interno")
     private String codigoInterno;
@@ -99,16 +99,15 @@ public class Producto {
     @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
-    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
+    // ✅ RELACIONES
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Compatibilidad> compatibilidades = new ArrayList<>();
 
-    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ProductoOem> codigosOem = new ArrayList<>();
 
     // ========================================
     // MÉTODOS DE COMPATIBILIDAD CON @JsonIgnore
-    // Estos métodos NO se serializan a JSON
-    // Solo se usan internamente en el código Java
     // ========================================
 
     @JsonIgnore
