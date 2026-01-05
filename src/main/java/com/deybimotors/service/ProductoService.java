@@ -7,6 +7,7 @@ import com.deybimotors.exception.ConflictException;
 import com.deybimotors.exception.ResourceNotFoundException;
 import com.deybimotors.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -16,15 +17,18 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Productos - ✅ CORREGIDO FINAL
+ * Servicio de Productos - ACTUALIZADO CON MÚLTIPLES IMÁGENES
  * - SIN codigo_referencia
  * - CON codigosOem desde producto_oem
  * - CON compatibilidades completas
+ * - CON múltiples imágenes
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductoService {
@@ -40,6 +44,7 @@ public class ProductoService {
     private final FileStorageService fileStorageService;
     private final CodigoOemRepository codigoOemRepository;
     private final CompatibilidadRepository compatibilidadRepository;
+    private final ProductoImagenRepository productoImagenRepository;
 
     @Transactional(readOnly = true)
     public List<ProductoDTO.ProductoResponse> listarTodos() {
@@ -188,6 +193,105 @@ public class ProductoService {
         producto.setEstado(true);
 
         Producto guardado = productoRepository.save(producto);
+
+        log.info("Producto creado - Código: {} - Sede: {}", guardado.getCodigoInterno(), sede.getNombre());
+
+        return convertirADTO(guardado);
+    }
+
+    /**
+     * Crear producto con imagen
+     */
+    @Transactional
+    public ProductoDTO.ProductoResponse crearConImagen(
+            ProductoDTO.ProductoRequest request,
+            MultipartFile imagen
+    ) {
+        if (productoRepository.existsByCodigoInterno(request.getCodigo())) {
+            throw new ConflictException("Ya existe un producto con el código: " + request.getCodigo());
+        }
+
+        Sede sede = sedeRepository.findById(request.getSedeId() != null ? request.getSedeId() : 1L)
+                .orElseThrow(() -> new ResourceNotFoundException("Sede no encontrada"));
+
+        Categoria categoria = categoriaRepository.findById(request.getCategoriaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada"));
+
+        Marca marca = marcaRepository.findById(request.getMarcaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Marca no encontrada"));
+
+        Subcategoria subcategoria = null;
+        if (request.getSubcategoriaId() != null) {
+            subcategoria = subcategoriaRepository.findById(request.getSubcategoriaId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Subcategoría no encontrada"));
+        }
+
+        Origen origen = null;
+        if (request.getOrigen() != null && !request.getOrigen().isEmpty()) {
+            origen = origenRepository.findByPais(request.getOrigen())
+                    .orElseGet(() -> {
+                        Origen nuevoOrigen = new Origen();
+                        nuevoOrigen.setPais(request.getOrigen());
+                        return origenRepository.save(nuevoOrigen);
+                    });
+        }
+
+        CodigoPrecio codigoPrecio = null;
+        if (request.getCodigoPrecio() != null && !request.getCodigoPrecio().isEmpty()) {
+            codigoPrecio = codigoPrecioRepository.findByCodigo(request.getCodigoPrecio())
+                    .orElseGet(() -> {
+                        CodigoPrecio nuevoCodigo = new CodigoPrecio();
+                        nuevoCodigo.setCodigo(request.getCodigoPrecio());
+                        return codigoPrecioRepository.save(nuevoCodigo);
+                    });
+        }
+
+        Producto producto = new Producto();
+        producto.setSede(sede);
+        producto.setCodigoInterno(request.getCodigo());
+        producto.setCodigoMarca(request.getCodigoMarca());
+        producto.setDescripcion(request.getNombre());
+        producto.setCategoria(categoria);
+        producto.setSubcategoria(subcategoria);
+        producto.setMarcaProducto(marca);
+        producto.setOrigen(origen);
+        producto.setMedida(request.getMedida());
+        producto.setDiametro(request.getDiametro());
+        producto.setTipo(request.getTipo());
+        producto.setMedida2(request.getMedida2());
+        producto.setStock(0);
+        producto.setCodigoPrecio(codigoPrecio);
+        producto.setPrecioCosto(request.getPrecioCosto());
+        producto.setPrecioVenta(request.getPrecioVenta());
+        producto.setPublicoCatalogo(request.getPublicoCatalogo() != null ? request.getPublicoCatalogo() : false);
+        producto.setEstado(true);
+
+        Producto guardado = productoRepository.save(producto);
+
+        if (imagen != null && !imagen.isEmpty()) {
+            try {
+                String rutaImagen = fileStorageService.guardarImagen(imagen, "productos");
+
+                ProductoImagen productoImagen = new ProductoImagen();
+                productoImagen.setProducto(guardado);
+                productoImagen.setUrl(rutaImagen);
+                productoImagen.setOrden(0);
+                productoImagen.setEsPrincipal(true);
+
+                guardado.getImagenes().add(productoImagen);
+                guardado.setFotoUrl(rutaImagen);
+
+                guardado = productoRepository.save(guardado);
+
+                log.info("Imagen subida correctamente: {}", rutaImagen);
+            } catch (IOException e) {
+                log.error("Error al subir imagen", e);
+                throw new BadRequestException("Error al subir la imagen: " + e.getMessage());
+            }
+        }
+
+        log.info("Producto creado - Código: {} - Sede: {}", guardado.getCodigoInterno(), sede.getNombre());
+
         return convertirADTO(guardado);
     }
 
@@ -245,7 +349,8 @@ public class ProductoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
 
         switch (campo.toLowerCase()) {
-            case "nombre", "descripcion":
+            case "nombre":
+            case "descripcion":
                 producto.setDescripcion((String) valor);
                 break;
             case "precioventa":
@@ -319,7 +424,132 @@ public class ProductoService {
     }
 
     // ========================================
-    // MÉTODOS AUXILIARES - ✅ CORREGIDOS
+    // MÉTODOS PARA MÚLTIPLES IMÁGENES
+    // ========================================
+
+    /**
+     * Subir múltiples imágenes a un producto
+     */
+    @Transactional
+    public List<String> subirImagenes(Long productoId, List<MultipartFile> archivos) throws IOException {
+        Producto producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
+
+        List<String> urls = new ArrayList<>();
+        int ordenActual = producto.getImagenes().size();
+        boolean esPrimeraImagen = producto.getImagenes().isEmpty();
+
+        for (MultipartFile archivo : archivos) {
+            String rutaImagen = fileStorageService.guardarImagen(archivo, "productos");
+
+            ProductoImagen imagen = new ProductoImagen();
+            imagen.setProducto(producto);
+            imagen.setUrl(rutaImagen);
+            imagen.setOrden(ordenActual++);
+            imagen.setEsPrincipal(esPrimeraImagen);
+
+            productoImagenRepository.save(imagen);
+            urls.add(rutaImagen);
+
+            if (esPrimeraImagen) {
+                producto.setFotoUrl(rutaImagen);
+                esPrimeraImagen = false;
+            }
+
+            log.info("Imagen agregada al producto {}: {}", productoId, rutaImagen);
+        }
+
+        productoRepository.save(producto);
+        return urls;
+    }
+
+    /**
+     * Eliminar una imagen específica
+     */
+    @Transactional
+    public void eliminarImagen(Long productoId, Long imagenId) {
+        Producto producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
+
+        ProductoImagen imagen = productoImagenRepository.findById(imagenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Imagen no encontrada"));
+
+        if (!imagen.getProducto().getId().equals(productoId)) {
+            throw new BadRequestException("La imagen no pertenece a este producto");
+        }
+
+        fileStorageService.eliminarArchivo(imagen.getUrl());
+
+        if (imagen.getEsPrincipal() && producto.getImagenes().size() > 1) {
+            ProductoImagen nuevaPrincipal = producto.getImagenes().stream()
+                    .filter(img -> !img.getId().equals(imagenId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (nuevaPrincipal != null) {
+                nuevaPrincipal.setEsPrincipal(true);
+                producto.setFotoUrl(nuevaPrincipal.getUrl());
+                productoImagenRepository.save(nuevaPrincipal);
+            }
+        } else if (producto.getImagenes().size() == 1) {
+            producto.setFotoUrl(null);
+        }
+
+        productoImagenRepository.delete(imagen);
+        productoRepository.save(producto);
+
+        log.info("Imagen eliminada del producto {}: {}", productoId, imagenId);
+    }
+
+    /**
+     * Cambiar orden de una imagen
+     */
+    @Transactional
+    public void cambiarOrdenImagen(Long productoId, Long imagenId, Integer nuevoOrden) {
+        ProductoImagen imagen = productoImagenRepository.findById(imagenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Imagen no encontrada"));
+
+        if (!imagen.getProducto().getId().equals(productoId)) {
+            throw new BadRequestException("La imagen no pertenece a este producto");
+        }
+
+        imagen.setOrden(nuevoOrden);
+        productoImagenRepository.save(imagen);
+
+        log.info("Orden de imagen actualizado: {} -> orden {}", imagenId, nuevoOrden);
+    }
+
+    /**
+     * Establecer una imagen como principal
+     */
+    @Transactional
+    public void establecerImagenPrincipal(Long productoId, Long imagenId) {
+        Producto producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
+
+        ProductoImagen imagen = productoImagenRepository.findById(imagenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Imagen no encontrada"));
+
+        if (!imagen.getProducto().getId().equals(productoId)) {
+            throw new BadRequestException("La imagen no pertenece a este producto");
+        }
+
+        for (ProductoImagen img : producto.getImagenes()) {
+            img.setEsPrincipal(false);
+            productoImagenRepository.save(img);
+        }
+
+        imagen.setEsPrincipal(true);
+        productoImagenRepository.save(imagen);
+
+        producto.setFotoUrl(imagen.getUrl());
+        productoRepository.save(producto);
+
+        log.info("Imagen principal actualizada para producto {}: {}", productoId, imagenId);
+    }
+
+    // ========================================
+    // MÉTODOS AUXILIARES
     // ========================================
 
     private ProductoDTO.ProductoResponse convertirADTO(Producto producto) {
@@ -329,7 +559,7 @@ public class ProductoService {
             copiarDatosBasicos(producto, dto);
             dto.setStockTotal(producto.getStock());
 
-            // ✅ CÓDIGOS OEM - Extraer de la relación producto_oem
+            // CÓDIGOS OEM
             if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
                 List<String> codigosOemList = producto.getCodigosOem().stream()
                         .map(po -> po.getCodigoOem().getCodigoOem())
@@ -337,7 +567,7 @@ public class ProductoService {
                 dto.setCodigosOem(codigosOemList);
             }
 
-            // ✅ COMPATIBILIDADES - Extraer completas
+            // COMPATIBILIDADES
             if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
                 List<ProductoDTO.CompatibilidadInfo> compatList = producto.getCompatibilidades().stream()
                         .map(c -> new ProductoDTO.CompatibilidadInfo(
@@ -351,11 +581,23 @@ public class ProductoService {
                 dto.setCompatibilidades(compatList);
             }
 
-        } catch (Exception e) {
-            System.err.println("❌ Error convirtiendo producto ID " + producto.getId() + ": " + e.getMessage());
-            e.printStackTrace();
+            // IMÁGENES
+            if (producto.getImagenes() != null && !producto.getImagenes().isEmpty()) {
+                List<ProductoDTO.ImagenInfo> imagenesInfo = producto.getImagenes().stream()
+                        .sorted((a, b) -> a.getOrden().compareTo(b.getOrden()))
+                        .map(img -> new ProductoDTO.ImagenInfo(
+                                img.getId(),
+                                img.getUrl(),
+                                img.getOrden(),
+                                img.getEsPrincipal()
+                        ))
+                        .collect(Collectors.toList());
+                dto.setImagenes(imagenesInfo);
+            }
 
-            // DTO con datos mínimos
+        } catch (Exception e) {
+            log.error("Error convirtiendo producto ID {}: {}", producto.getId(), e.getMessage(), e);
+
             dto.setId(producto.getId());
             dto.setCodigo(producto.getCodigoInterno());
             dto.setDescripcion(producto.getDescripcion());
@@ -372,19 +614,16 @@ public class ProductoService {
         dto.setCodigoMarca(producto.getCodigoMarca());
         dto.setDescripcion(producto.getDescripcion());
 
-        // Categoría
         if (producto.getCategoria() != null) {
             dto.setCategoriaId(producto.getCategoria().getId());
             dto.setCategoriaNombre(producto.getCategoria().getNombre());
         }
 
-        // Subcategoría
         if (producto.getSubcategoria() != null) {
             dto.setSubcategoriaId(producto.getSubcategoria().getId());
             dto.setSubcategoriaNombre(producto.getSubcategoria().getNombre());
         }
 
-        // Marca
         if (producto.getMarcaProducto() != null) {
             dto.setMarcaId(producto.getMarcaProducto().getId());
             dto.setMarcaNombre(producto.getMarcaProducto().getNombre());
@@ -403,6 +642,7 @@ public class ProductoService {
         dto.setActivo(producto.getEstado());
         dto.setPublicoCatalogo(producto.getPublicoCatalogo());
         dto.setFechaCreacion(producto.getFechaCreacion());
+
         dto.setFotoUrl(producto.getFotoUrl());
     }
 
@@ -461,7 +701,7 @@ public class ProductoService {
 
         dto.setFotoUrl(producto.getFotoUrl());
 
-        // ✅ CÓDIGOS OEM
+        // CÓDIGOS OEM
         if (producto.getCodigosOem() != null && !producto.getCodigosOem().isEmpty()) {
             List<String> codigosOemList = producto.getCodigosOem().stream()
                     .map(po -> po.getCodigoOem().getCodigoOem())
@@ -469,7 +709,7 @@ public class ProductoService {
             dto.setCodigosOem(codigosOemList);
         }
 
-        // ✅ COMPATIBILIDADES
+        // COMPATIBILIDADES
         if (producto.getCompatibilidades() != null && !producto.getCompatibilidades().isEmpty()) {
             List<ProductoDTO.CompatibilidadInfo> compatList = producto.getCompatibilidades().stream()
                     .map(c -> new ProductoDTO.CompatibilidadInfo(
@@ -481,6 +721,20 @@ public class ProductoService {
                     ))
                     .collect(Collectors.toList());
             dto.setCompatibilidades(compatList);
+        }
+
+        // IMÁGENES
+        if (producto.getImagenes() != null && !producto.getImagenes().isEmpty()) {
+            List<ProductoDTO.ImagenInfo> imagenesInfo = producto.getImagenes().stream()
+                    .sorted((a, b) -> a.getOrden().compareTo(b.getOrden()))
+                    .map(img -> new ProductoDTO.ImagenInfo(
+                            img.getId(),
+                            img.getUrl(),
+                            img.getOrden(),
+                            img.getEsPrincipal()
+                    ))
+                    .collect(Collectors.toList());
+            dto.setImagenes(imagenesInfo);
         }
 
         return dto;

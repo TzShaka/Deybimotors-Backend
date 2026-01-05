@@ -13,9 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Producto - ✅ CORREGIDO FINAL
+ * Entidad Producto - ✅ ACTUALIZADO CON MÚLTIPLES IMÁGENES
  * - SIN codigo_referencia
  * - CON relaciones correctas a producto_oem y compatibilidades
+ * - ✅ CON múltiples imágenes (producto_imagenes)
  */
 @Entity
 @Table(name = "productos")
@@ -34,8 +35,6 @@ public class Producto {
 
     @Column(length = 50, name = "codigo_marca")
     private String codigoMarca;
-
-    // ✅ ELIMINADO: codigo_referencia
 
     @Column(nullable = false, unique = true, length = 50, name = "codigo_interno")
     private String codigoInterno;
@@ -99,12 +98,17 @@ public class Producto {
     @Column(nullable = false, updatable = false, name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
 
-    // ✅ RELACIONES
+    // ✅ RELACIONES EXISTENTES
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Compatibilidad> compatibilidades = new ArrayList<>();
 
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ProductoOem> codigosOem = new ArrayList<>();
+
+    // ✅ NUEVA RELACIÓN: MÚLTIPLES IMÁGENES
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("orden ASC")
+    private List<ProductoImagen> imagenes = new ArrayList<>();
 
     // ========================================
     // MÉTODOS DE COMPATIBILIDAD CON @JsonIgnore

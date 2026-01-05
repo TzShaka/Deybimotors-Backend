@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -17,7 +18,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Controlador de Productos - ✅ CORREGIDO
+ * Controlador de Productos - ✅ ACTUALIZADO CON MÚLTIPLES IMÁGENES
  * RF-004 a RF-017
  */
 @RestController
@@ -104,6 +105,20 @@ public class ProductoController {
     }
 
     /**
+     * POST /api/productos/con-imagen
+     * Crear producto con imagen en una sola petición
+     */
+    @PostMapping(value = "/con-imagen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
+    public ResponseEntity<ProductoDTO.ProductoResponse> crearConImagen(
+            @RequestPart("producto") @Valid ProductoDTO.ProductoRequest request,
+            @RequestPart(value = "imagen", required = false) MultipartFile imagen
+    ) {
+        ProductoDTO.ProductoResponse response = productoService.crearConImagen(request, imagen);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
      * PUT /api/productos/{id}
      * Actualizar producto completo
      */
@@ -143,7 +158,7 @@ public class ProductoController {
 
     /**
      * POST /api/productos/{id}/foto
-     * ✅ CORREGIDO: Subir/actualizar foto de producto
+     * Subir/actualizar foto de producto (mantener para compatibilidad)
      */
     @PostMapping("/{id}/foto")
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
@@ -157,12 +172,73 @@ public class ProductoController {
 
     /**
      * DELETE /api/productos/{id}/foto
-     * ✅ NUEVO: Eliminar foto de producto
+     * Eliminar foto de producto
      */
     @DeleteMapping("/{id}/foto")
     @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
     public ResponseEntity<String> eliminarFoto(@PathVariable Long id) {
         productoService.eliminarFoto(id);
         return ResponseEntity.ok("Foto eliminada correctamente");
+    }
+
+    // ========================================
+    // ✅ NUEVOS ENDPOINTS PARA MÚLTIPLES IMÁGENES
+    // ========================================
+
+    /**
+     * POST /api/productos/{id}/imagenes
+     * Subir múltiples imágenes a un producto
+     */
+    @PostMapping("/{id}/imagenes")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
+    public ResponseEntity<List<String>> subirImagenes(
+            @PathVariable Long id,
+            @RequestParam("archivos") List<MultipartFile> archivos
+    ) throws IOException {
+        List<String> urls = productoService.subirImagenes(id, archivos);
+        return ResponseEntity.ok(urls);
+    }
+
+    /**
+     * DELETE /api/productos/{productoId}/imagenes/{imagenId}
+     * Eliminar una imagen específica
+     */
+    @DeleteMapping("/{productoId}/imagenes/{imagenId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
+    public ResponseEntity<String> eliminarImagen(
+            @PathVariable Long productoId,
+            @PathVariable Long imagenId
+    ) {
+        productoService.eliminarImagen(productoId, imagenId);
+        return ResponseEntity.ok("Imagen eliminada correctamente");
+    }
+
+    /**
+     * PATCH /api/productos/{productoId}/imagenes/{imagenId}/orden
+     * Cambiar orden de una imagen
+     */
+    @PatchMapping("/{productoId}/imagenes/{imagenId}/orden")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
+    public ResponseEntity<String> cambiarOrdenImagen(
+            @PathVariable Long productoId,
+            @PathVariable Long imagenId,
+            @RequestParam Integer nuevoOrden
+    ) {
+        productoService.cambiarOrdenImagen(productoId, imagenId, nuevoOrden);
+        return ResponseEntity.ok("Orden actualizado correctamente");
+    }
+
+    /**
+     * PATCH /api/productos/{productoId}/imagenes/{imagenId}/principal
+     * Establecer una imagen como principal
+     */
+    @PatchMapping("/{productoId}/imagenes/{imagenId}/principal")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ALMACENERO')")
+    public ResponseEntity<String> establecerImagenPrincipal(
+            @PathVariable Long productoId,
+            @PathVariable Long imagenId
+    ) {
+        productoService.establecerImagenPrincipal(productoId, imagenId);
+        return ResponseEntity.ok("Imagen principal actualizada");
     }
 }

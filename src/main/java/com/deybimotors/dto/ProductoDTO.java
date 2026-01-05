@@ -12,10 +12,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO para Producto - ✅ CORREGIDO
+ * DTO para Producto - ✅ ACTUALIZADO CON IMÁGENES
  * - SIN codigo_referencia
  * - CON lista de codigosOem (desde producto_oem)
  * - CON lista de compatibilidades
+ * - ✅ CON lista de imágenes
  */
 public class ProductoDTO {
 
@@ -53,7 +54,7 @@ public class ProductoDTO {
         private Boolean publicoCatalogo;
         private LocalDateTime fechaCreacion;
 
-        // Foto
+        // Foto (mantener para compatibilidad)
         private String fotoUrl;
 
         // Stock
@@ -64,6 +65,22 @@ public class ProductoDTO {
 
         // ✅ COMPATIBILIDADES - Lista completa
         private List<CompatibilidadInfo> compatibilidades;
+
+        // ✅ NUEVO: MÚLTIPLES IMÁGENES
+        private List<ImagenInfo> imagenes;
+    }
+
+    /**
+     * ✅ NUEVA CLASE: Información de imágenes
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImagenInfo {
+        private Long id;
+        private String url;
+        private Integer orden;
+        private Boolean esPrincipal;
     }
 
     @Data
@@ -166,7 +183,7 @@ public class ProductoDTO {
         private BigDecimal precioVenta;
         private String disponibilidad;
 
-        // Foto
+        // Foto (mantener para compatibilidad)
         private String fotoUrl;
 
         // ✅ CÓDIGOS OEM
@@ -174,5 +191,8 @@ public class ProductoDTO {
 
         // ✅ COMPATIBILIDADES
         private List<CompatibilidadInfo> compatibilidades;
+
+        // ✅ NUEVO: MÚLTIPLES IMÁGENES
+        private List<ImagenInfo> imagenes;
     }
 }
