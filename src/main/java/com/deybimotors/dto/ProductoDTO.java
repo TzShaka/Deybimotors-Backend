@@ -12,11 +12,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO para Producto - ✅ ACTUALIZADO CON IMÁGENES
- * - SIN codigo_referencia
+ * DTO para Producto - ✅ ACTUALIZADO CON codigo_referencia
+ * - CON codigo_referencia
  * - CON lista de codigosOem (desde producto_oem)
  * - CON lista de compatibilidades
- * - ✅ CON lista de imágenes
+ * - CON lista de imágenes
  */
 public class ProductoDTO {
 
@@ -27,6 +27,7 @@ public class ProductoDTO {
         private Long id;
         private String codigo;
         private String codigoMarca;
+        private String codigoReferencia; // ✅ NUEVO CAMPO
         private String descripcion;
 
         // Categorización
@@ -60,18 +61,18 @@ public class ProductoDTO {
         // Stock
         private Integer stockTotal;
 
-        // ✅ CÓDIGOS OEM - Lista completa
+        // CÓDIGOS OEM - Lista completa
         private List<String> codigosOem;
 
-        // ✅ COMPATIBILIDADES - Lista completa
+        // COMPATIBILIDADES - Lista completa
         private List<CompatibilidadInfo> compatibilidades;
 
-        // ✅ NUEVO: MÚLTIPLES IMÁGENES
+        // MÚLTIPLES IMÁGENES
         private List<ImagenInfo> imagenes;
     }
 
     /**
-     * ✅ NUEVA CLASE: Información de imágenes
+     * Información de imágenes
      */
     @Data
     @NoArgsConstructor
@@ -110,6 +111,8 @@ public class ProductoDTO {
 
         private String codigoMarca;
 
+        private String codigoReferencia; // ✅ NUEVO CAMPO
+
         @NotBlank(message = "El nombre es obligatorio")
         private String nombre;
         private String descripcion;
@@ -142,10 +145,10 @@ public class ProductoDTO {
         private Boolean publicoCatalogo = false;
         private String observaciones;
 
-        // ✅ CÓDIGOS OEM - Lista de IDs para asignar
+        // CÓDIGOS OEM - Lista de IDs para asignar
         private List<Long> codigosOemIds;
 
-        // ✅ COMPATIBILIDADES - Lista para crear
+        // COMPATIBILIDADES - Lista para crear
         private List<CompatibilidadRequest> compatibilidades;
     }
 
@@ -165,6 +168,7 @@ public class ProductoDTO {
     public static class ProductoCatalogoPublicoResponse {
         private Long id;
         private String codigo;
+        private String codigoReferencia; // ✅ NUEVO CAMPO (opcional para catálogo público)
         private String nombre;
         private String descripcion;
 
@@ -186,13 +190,13 @@ public class ProductoDTO {
         // Foto (mantener para compatibilidad)
         private String fotoUrl;
 
-        // ✅ CÓDIGOS OEM
+        // CÓDIGOS OEM
         private List<String> codigosOem;
 
-        // ✅ COMPATIBILIDADES
+        // COMPATIBILIDADES
         private List<CompatibilidadInfo> compatibilidades;
 
-        // ✅ NUEVO: MÚLTIPLES IMÁGENES
+        // MÚLTIPLES IMÁGENES
         private List<ImagenInfo> imagenes;
     }
 }

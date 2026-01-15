@@ -90,6 +90,10 @@ public class ProductoController {
         return ResponseEntity.ok(productoService.buscarConFiltros(nombre, categoriaId, subcategoriaId, marcaId, codigo));
     }
 
+    @GetMapping("/todas-sedes")
+    public ResponseEntity<List<ProductoDTO.ProductoResponse>> listarTodosConStockTotal() {
+        return ResponseEntity.ok(productoService.listarTodosConStockTotal());
+    }
     /**
      * POST /api/productos
      * Crear nuevo producto

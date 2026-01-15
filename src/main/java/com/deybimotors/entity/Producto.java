@@ -13,10 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Producto - ✅ ACTUALIZADO CON MÚLTIPLES IMÁGENES
- * - SIN codigo_referencia
+ * Entidad Producto - ✅ ACTUALIZADO CON codigo_referencia
+ * - CON codigo_referencia
  * - CON relaciones correctas a producto_oem y compatibilidades
- * - ✅ CON múltiples imágenes (producto_imagenes)
+ * - CON múltiples imágenes (producto_imagenes)
  */
 @Entity
 @Table(name = "productos")
@@ -35,6 +35,10 @@ public class Producto {
 
     @Column(length = 50, name = "codigo_marca")
     private String codigoMarca;
+
+    // ✅ NUEVO CAMPO: código_referencia
+    @Column(length = 50, name = "codigo_referencia")
+    private String codigoReferencia;
 
     @Column(nullable = false, unique = true, length = 50, name = "codigo_interno")
     private String codigoInterno;
@@ -105,7 +109,7 @@ public class Producto {
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ProductoOem> codigosOem = new ArrayList<>();
 
-    // ✅ NUEVA RELACIÓN: MÚLTIPLES IMÁGENES
+    // ✅ RELACIÓN: MÚLTIPLES IMÁGENES
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("orden ASC")
     private List<ProductoImagen> imagenes = new ArrayList<>();

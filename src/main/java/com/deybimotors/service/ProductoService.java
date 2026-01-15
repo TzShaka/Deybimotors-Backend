@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de Productos - ACTUALIZADO CON MÚLTIPLES IMÁGENES
- * - SIN codigo_referencia
+ * Servicio de Productos - ✅ ACTUALIZADO CON codigo_referencia
+ * - CON codigo_referencia
  * - CON codigosOem desde producto_oem
  * - CON compatibilidades completas
  * - CON múltiples imágenes
@@ -176,6 +176,7 @@ public class ProductoService {
         producto.setSede(sede);
         producto.setCodigoInterno(request.getCodigo());
         producto.setCodigoMarca(request.getCodigoMarca());
+        producto.setCodigoReferencia(request.getCodigoReferencia()); // ✅ NUEVO
         producto.setDescripcion(request.getNombre());
         producto.setCategoria(categoria);
         producto.setSubcategoria(subcategoria);
@@ -250,6 +251,7 @@ public class ProductoService {
         producto.setSede(sede);
         producto.setCodigoInterno(request.getCodigo());
         producto.setCodigoMarca(request.getCodigoMarca());
+        producto.setCodigoReferencia(request.getCodigoReferencia()); // ✅ NUEVO
         producto.setDescripcion(request.getNombre());
         producto.setCategoria(categoria);
         producto.setSubcategoria(subcategoria);
@@ -294,7 +296,6 @@ public class ProductoService {
 
         return convertirADTO(guardado);
     }
-
     @Transactional
     public ProductoDTO.ProductoResponse actualizar(Long id, ProductoDTO.ProductoRequest request) {
 
@@ -329,6 +330,7 @@ public class ProductoService {
         }
 
         producto.setCodigoMarca(request.getCodigoMarca());
+        producto.setCodigoReferencia(request.getCodigoReferencia()); // ✅ NUEVO
         producto.setDescripcion(request.getNombre());
         producto.setMedida(request.getMedida());
         producto.setDiametro(request.getDiametro());
@@ -353,6 +355,9 @@ public class ProductoService {
             case "descripcion":
                 producto.setDescripcion((String) valor);
                 break;
+            case "codigoreferencia": // ✅ NUEVO
+                producto.setCodigoReferencia((String) valor);
+                break;
             case "precioventa":
                 producto.setPrecioVenta(new BigDecimal(valor.toString()));
                 break;
@@ -372,7 +377,17 @@ public class ProductoService {
         Producto actualizado = productoRepository.save(producto);
         return convertirADTO(actualizado);
     }
+    @Transactional(readOnly = true)
+    public List<ProductoDTO.ProductoResponse> listarTodosConStockTotal() {
+        // Obtener TODOS los productos SIN filtrar por estado
+        List<Producto> todosLosProductos = productoRepository.findAll();
 
+        log.info("📦 Total de productos en BD: {}", todosLosProductos.size());
+
+        return todosLosProductos.stream()
+                .map(this::convertirADTO)
+                .collect(Collectors.toList());
+    }
     @Transactional
     public void eliminar(Long id) {
 
@@ -427,9 +442,6 @@ public class ProductoService {
     // MÉTODOS PARA MÚLTIPLES IMÁGENES
     // ========================================
 
-    /**
-     * Subir múltiples imágenes a un producto
-     */
     @Transactional
     public List<String> subirImagenes(Long productoId, List<MultipartFile> archivos) throws IOException {
         Producto producto = productoRepository.findById(productoId)
@@ -463,9 +475,6 @@ public class ProductoService {
         return urls;
     }
 
-    /**
-     * Eliminar una imagen específica
-     */
     @Transactional
     public void eliminarImagen(Long productoId, Long imagenId) {
         Producto producto = productoRepository.findById(productoId)
@@ -501,9 +510,6 @@ public class ProductoService {
         log.info("Imagen eliminada del producto {}: {}", productoId, imagenId);
     }
 
-    /**
-     * Cambiar orden de una imagen
-     */
     @Transactional
     public void cambiarOrdenImagen(Long productoId, Long imagenId, Integer nuevoOrden) {
         ProductoImagen imagen = productoImagenRepository.findById(imagenId)
@@ -519,9 +525,6 @@ public class ProductoService {
         log.info("Orden de imagen actualizado: {} -> orden {}", imagenId, nuevoOrden);
     }
 
-    /**
-     * Establecer una imagen como principal
-     */
     @Transactional
     public void establecerImagenPrincipal(Long productoId, Long imagenId) {
         Producto producto = productoRepository.findById(productoId)
@@ -612,6 +615,7 @@ public class ProductoService {
         dto.setId(producto.getId());
         dto.setCodigo(producto.getCodigoInterno());
         dto.setCodigoMarca(producto.getCodigoMarca());
+        dto.setCodigoReferencia(producto.getCodigoReferencia()); // ✅ NUEVO
         dto.setDescripcion(producto.getDescripcion());
 
         if (producto.getCategoria() != null) {
@@ -677,6 +681,7 @@ public class ProductoService {
 
         dto.setId(producto.getId());
         dto.setCodigo(producto.getCodigoInterno());
+        dto.setCodigoReferencia(producto.getCodigoReferencia()); // ✅ NUEVO (opcional)
         dto.setNombre(producto.getDescripcion());
         dto.setDescripcion(producto.getDescripcion());
 

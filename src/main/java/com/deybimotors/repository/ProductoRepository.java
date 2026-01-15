@@ -11,8 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * ProductoRepository - ✅ CORREGIDO FINAL
- * Queries explícitas usando = 1 en lugar de = true
+ * ProductoRepository - ✅ ACTUALIZADO CON codigo_referencia
  */
 @Repository
 public interface ProductoRepository extends JpaRepository<Producto, Long>,
@@ -22,10 +21,13 @@ public interface ProductoRepository extends JpaRepository<Producto, Long>,
     Optional<Producto> findByCodigoInterno(String codigoInterno);
     boolean existsByCodigoInterno(String codigoInterno);
 
+    // ✅ NUEVO: Búsqueda por código referencia
+    Optional<Producto> findByCodigoReferencia(String codigoReferencia);
+    boolean existsByCodigoReferencia(String codigoReferencia);
+
     // Búsqueda por descripción
     List<Producto> findByDescripcionContainingIgnoreCase(String descripcion);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT p FROM Producto p WHERE p.estado = true")
     List<Producto> findByEstadoTrue();
 
@@ -41,35 +43,27 @@ public interface ProductoRepository extends JpaRepository<Producto, Long>,
     // Por sede
     List<Producto> findBySedeId(Long sedeId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock = 0 AND p.estado = true")
     List<Producto> findProductosSinStockPorSede(@Param("sedeId") Long sedeId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT p FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= 2 AND p.estado = true")
     List<Producto> findProductosStockBajoPorSede(@Param("sedeId") Long sedeId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.estado = true")
     long countProductosActivos();
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.categoria.id = :categoriaId AND p.estado = true")
     long countByCategoriaId(@Param("categoriaId") Long categoriaId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.marcaProducto.id = :marcaId AND p.estado = true")
     long countByMarcaProductoId(@Param("marcaId") Long marcaId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.subcategoria.id = :subcategoriaId AND p.estado = true")
     long countBySubcategoriaId(@Param("subcategoriaId") Long subcategoriaId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock = 0 AND p.estado = true")
     long countProductosSinStock(@Param("sedeId") Long sedeId);
 
-    // ✅ SOLUCIÓN: Usar true en lugar de 1
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.sede.id = :sedeId AND p.stock > 0 AND p.stock <= 2 AND p.estado = true")
     long countProductosStockBajo(@Param("sedeId") Long sedeId);
 
